@@ -6,17 +6,15 @@ Method: Empirical formulas based on composite mechanics
 
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
+import os
 import sys
 from datetime import datetime
 
 app = Flask(__name__, static_folder='static')
 CORS(app)
 
-# FIXED PORT FOR RAILWAY
-PORT = 8088
-
 print("="*80, file=sys.stderr)
-print(f"🚀 Composite ML API v2.0 - Starting on PORT {PORT}", file=sys.stderr)
+print(f"🚀 Composite ML API v2.0 - Starting...", file=sys.stderr)
 print(f"📅 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", file=sys.stderr)
 print("="*80, file=sys.stderr)
 
@@ -116,7 +114,6 @@ def health():
         'status': 'healthy',
         'version': '2.0',
         'method': 'empirical_formulas',
-        'port': PORT,
         'timestamp': datetime.now().isoformat()
     })
 
@@ -247,5 +244,5 @@ print("="*80, file=sys.stderr)
 
 
 if __name__ == '__main__':
-    print(f"🌐 Starting Flask server on 0.0.0.0:{PORT}", file=sys.stderr)
-    app.run(host='0.0.0.0', port=PORT, debug=False)
+    port = int(os.getenv('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)

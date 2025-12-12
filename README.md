@@ -12,21 +12,31 @@ Advanced mechanical property prediction for fiber-reinforced composites using em
 - **RESTful API**: JSON-based endpoints
 - **Web Interface**: Interactive prediction tool
 
-## Material Database
+## Technology Stack
 
-### Fiber Types
-- Carbon
-- Glass (E-glass)
-- Aramid (Kevlar)
-- Basalt
-- Natural fibers
+- **Backend**: Flask 3.0.0
+- **Server**: Gunicorn 21.2.0
+- **CORS**: Flask-CORS 4.0.0
+- **Deployment**: Railway.com
+- **Method**: Empirical formulas (no ML libraries)
 
-### Matrix Types
-- Epoxy
-- Polyester
-- Vinyl ester
-- PEEK
-- PA6 (Nylon 6)
+## Local Development
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Run locally
+python app.py
+
+# Access at http://localhost:5000
+```
+
+## Deployment
+
+Configured for Railway.com with automatic deployment from GitHub.
+
+Railway automatically provides the PORT environment variable.
 
 ## API Endpoints
 
@@ -53,22 +63,6 @@ Single material prediction
 }
 ```
 
-**Response:**
-```json
-{
-  "success": true,
-  "predictions": {
-    "tensile_strength_MPa": 1500.0,
-    "tensile_modulus_GPa": 130.0,
-    "compressive_strength_MPa": 1200.0,
-    "flexural_strength_MPa": 1400.0,
-    "flexural_modulus_GPa": 125.0,
-    "ILSS_MPa": 75.0,
-    "impact_energy_J": 18.0
-  }
-}
-```
-
 ### POST /api/predict/batch
 Batch predictions for multiple samples
 
@@ -78,49 +72,9 @@ Complete material database
 ### GET /api/options
 Available options for all parameters
 
-## Prediction Method
-
-**Rule of Mixtures with Correction Factors:**
-
-```
-Property = Base_Value × (Vf/0.6) × Layup_Factor × Manufacturing_Factor
-```
-
-- Base values: Literature data at Vf = 0.6
-- Volume fraction effect: Linear scaling
-- Layup factors: 0.4 - 1.0 depending on fiber orientation
-- Manufacturing factors: 0.85 - 1.0 depending on process quality
-
-## Technology Stack
-
-- **Backend**: Flask 3.0.0
-- **Server**: Gunicorn 21.2.0
-- **CORS**: flask-cors 4.0.0
-- **Deployment**: Railway.com
-- **Method**: Empirical formulas (no ML libraries)
-
-## Local Development
-
-```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Run locally
-python app.py
-
-# Access at http://localhost:8088
-```
-
-## Deployment
-
-Configured for Railway.com with automatic deployment from GitHub.
-
-**Environment Variables:**
-- `PORT`: 8088 (set in Railway Variables)
-
 ## License
 
-MIT License - See LICENSE file
+MIT License
 
 ## Version
 
