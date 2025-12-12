@@ -23,8 +23,8 @@ wheels/
 .installed.cfg
 *.egg
 
-# Models (optional - include if want to commit trained models)
-# models/*.pkl
+# Models (will be generated during build)
+models/*.pkl
 
 # Data
 # data/*.csv
