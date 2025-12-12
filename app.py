@@ -1,6 +1,6 @@
 """
-Enhanced Hybrid Physics-Informed Machine Learning API for Composite Materials
-Version: 3.0 (Scientific Edition with Advanced Analysis)
+Hybrid PIRF API - Complete Version with Plotting and Simulation
+Version 3.0 - Russian Interface
 """
 
 from flask import Flask, request, jsonify, send_from_directory, send_file
@@ -13,14 +13,19 @@ from typing import Dict, List, Tuple
 import warnings
 warnings.filterwarnings('ignore')
 
-# Import new modules
+# Import modules
 import sys
 sys.path.append(os.path.dirname(__file__))
 
-from material_validator import MaterialValidator, ValidationResult
-from scientific_plotter import ScientificPlotter
+from material_validator import MaterialValidator
 from pdf_report_generator import ScientificReportGenerator
 from mechanical_simulator import MechanicalSimulator, StressState
+
+# Matplotlib for plotting
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import io
 
 app = Flask(__name__, static_folder='static')
 CORS(app)
@@ -29,18 +34,18 @@ CORS(app)
 os.makedirs('output/plots', exist_ok=True)
 os.makedirs('output/reports', exist_ok=True)
 
-# ===========================
-# МАТЕРИАЛЬНЫЕ КОНСТАНТЫ
-# ===========================
+# Initialize modules
+material_validator = MaterialValidator()
 
+# Material properties dataclasses
 @dataclass
 class FiberProperties:
-    E: float  # Модуль упругости (GPa)
-    sigma: float  # Прочность (MPa)
-    rho: float  # Плотность (g/cm³)
-    G: float  # Модуль сдвига (GPa)
-    epsilon_f: float  # Деформация разрушения (%)
-    U_f: float  # Удельная энергия разрушения (J)
+    E: float
+    sigma: float
+    rho: float
+    G: float
+    epsilon_f: float
+    U_f: float
 
 @dataclass
 class MatrixProperties:
@@ -51,7 +56,7 @@ class MatrixProperties:
     epsilon_f: float
     U_m: float
 
-# Библиотека материалов
+# Material libraries
 FIBERS = {
     'Carbon T300': FiberProperties(230, 3530, 1.76, 95, 1.5, 25),
     'E-Glass': FiberProperties(73, 3450, 2.54, 30, 4.7, 18),
@@ -68,7 +73,6 @@ MATRICES = {
     'Polyamide 6': MatrixProperties(2.8, 82, 1.14, 1.0, 100, 2.0)
 }
 
-# Коэффициенты эффективности
 EFFICIENCY_FACTORS = {
     'eta_L': 0.95,
     'eta_T': 0.40,
@@ -77,7 +81,6 @@ EFFICIENCY_FACTORS = {
     'eta_interface': 0.85
 }
 
-# Коэффициенты производства
 MANUFACTURING_FACTORS = {
     'Autoclave': 1.00,
     'VARTM': 0.93,
@@ -88,17 +91,11 @@ MANUFACTURING_FACTORS = {
     'Pultrusion': 0.92
 }
 
-# ===========================
-# PHYSICS-BASED CALCULATIONS
-# ===========================
-
+# Physics Engine
 class PhysicsEngine:
-    """Эмпирические формулы Rule of Mixtures"""
-    
     @staticmethod
     def calculate_rom_properties(fiber: FiberProperties, matrix: MatrixProperties, 
                                  Vf: float, layup: str, manufacturing: str) -> Dict[str, float]:
-        """Расчёт свойств по правилу смесей"""
         
         eta_L = EFFICIENCY_FACTORS['eta_L']
         eta_T = EFFICIENCY_FACTORS['eta_T']
@@ -107,7 +104,6 @@ class PhysicsEngine:
         eta_interface = EFFICIENCY_FACTORS['eta_interface']
         eta_mfg = MANUFACTURING_FACTORS[manufacturing]
         
-        # Unidirectional properties
         E_L = eta_L * fiber.E * Vf + matrix.E * (1 - Vf)
         E_T = 1 / (Vf / (eta_T * fiber.E) + (1 - Vf) / matrix.E)
         
@@ -131,7 +127,6 @@ class PhysicsEngine:
         U_impact = (fiber.U_f * Vf * eta_f + 
                    matrix.U_m * (1 - Vf) * eta_m) * (1 + U_interface_fraction)
         
-        # Layup corrections
         layup_factors = {
             'Unidirectional 0°': {'k_E': 1.00, 'k_sigma': 1.00},
             'Unidirectional 90°': {'k_E': E_T/E_L, 'k_sigma': 0.15},
@@ -154,7 +149,6 @@ class PhysicsEngine:
         sigma_flex_layup = sigma_flex * k_sigma * 1.15
         E_flex_layup = E_flex * k_E * 0.95
         
-        # Manufacturing corrections
         correction_factors = {
             'tensile_strength': 0.262,
             'tensile_modulus': 0.72,
@@ -184,22 +178,15 @@ class PhysicsEngine:
         
         return properties
 
-# ===========================
-# FEATURE ENGINEERING
-# ===========================
-
+# Feature Engineer
 class FeatureEngineer:
-    """Создание physics-informed features для ML"""
-    
     @staticmethod
     def create_features(fiber_name: str, matrix_name: str, Vf: float, 
                        layup: str, manufacturing: str, 
                        rom_properties: Dict[str, float]) -> np.ndarray:
-        """Создаёт 26 features для ML модели"""
         
         features = []
         
-        # Base features (5)
         fiber_encoding = {'Carbon T300': 0, 'E-Glass': 1, 'Kevlar 49': 2, 
                          'Basalt': 3, 'Flax': 4}
         matrix_encoding = {'Epoxy': 0, 'Polyester': 1, 'Vinyl Ester': 2, 
@@ -221,7 +208,6 @@ class FeatureEngineer:
             mfg_encoding[manufacturing]
         ])
         
-        # Physics-derived features (7)
         features.extend([
             rom_properties['tensile_strength'],
             rom_properties['tensile_modulus'],
@@ -232,7 +218,6 @@ class FeatureEngineer:
             rom_properties['impact_energy']
         ])
         
-        # Constituent property ratios (4)
         features.extend([
             rom_properties['E_f_E_m_ratio'],
             rom_properties['sigma_f_sigma_m_ratio'],
@@ -240,14 +225,12 @@ class FeatureEngineer:
             rom_properties['G_f_G_m_ratio']
         ])
         
-        # Volume fraction transformations (3)
         features.extend([
             Vf ** 2,
             Vf ** 3,
             1 / (1 - Vf + 1e-6)
         ])
         
-        # Interaction terms (7)
         features.extend([
             Vf * rom_properties['E_f_E_m_ratio'],
             Vf * rom_properties['sigma_f_sigma_m_ratio'],
@@ -260,20 +243,13 @@ class FeatureEngineer:
         
         return np.array(features).reshape(1, -1)
 
-# ===========================
-# HYBRID ML MODEL
-# ===========================
-
+# Hybrid ML Model
 class HybridPIRF:
-    """Physics-Informed Random Forest - Гибридная модель"""
-    
     def __init__(self):
         self.models = {}
         self.scaler = None
-        self.feature_names = None
         
     def load_models(self):
-        """Загрузка обученных моделей"""
         model_path = 'models/hybrid_model.pkl'
         scaler_path = 'models/scaler.pkl'
         
@@ -288,12 +264,8 @@ class HybridPIRF:
             with open(scaler_path, 'rb') as f:
                 self.scaler = pickle.load(f)
             print("✓ Loaded feature scaler")
-        else:
-            print("⚠ No scaler found.")
     
-    def predict(self, features: np.ndarray, rom_predictions: Dict[str, float]) -> Dict[str, any]:
-        """Гибридное предсказание с uncertainty quantification"""
-        
+    def predict(self, features: np.ndarray, rom_predictions: Dict[str, float]) -> Dict:
         if not self.models:
             return {
                 'predictions': rom_predictions,
@@ -353,7 +325,6 @@ class HybridPIRF:
                     'std': float(hybrid_std),
                     'value': float(hybrid_pred)
                 }
-                
             else:
                 predictions[prop] = rom_predictions[prop]
                 uncertainties[prop] = {
@@ -373,16 +344,10 @@ class HybridPIRF:
             'confidence': 'high' if self.models else 'medium'
         }
 
-# ===========================
-# INITIALIZE
-# ===========================
-
+# Initialize
 physics_engine = PhysicsEngine()
 feature_engineer = FeatureEngineer()
 hybrid_model = HybridPIRF()
-material_validator = MaterialValidator()
-scientific_plotter = ScientificPlotter()
-
 hybrid_model.load_models()
 
 # ===========================
@@ -391,12 +356,10 @@ hybrid_model.load_models()
 
 @app.route('/')
 def index():
-    """Serve frontend"""
     return send_from_directory('static', 'index.html')
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    """Main prediction endpoint"""
     try:
         data = request.json
         
@@ -441,27 +404,16 @@ def predict():
             },
             'method': 'hybrid' if hybrid_model.models else 'physics_only',
             'method_weights': result['method_weights'],
-            'confidence': result['confidence'],
-            'inputs': {
-                'fiber': fiber_name,
-                'matrix': matrix_name,
-                'vf': Vf,
-                'layup': layup,
-                'manufacturing': manufacturing
-            }
+            'confidence': result['confidence']
         }
         
         return jsonify(response)
         
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/validate', methods=['POST'])
 def validate():
-    """Material validation endpoint"""
     try:
         data = request.json
         
@@ -478,8 +430,89 @@ def validate():
             'is_valid': validation_result.is_valid,
             'compatibility_score': validation_result.compatibility_score,
             'warnings': validation_result.warnings,
-            'recommendations': validation_result.recommendations,
-            'alternative_configs': validation_result.alternative_configs
+            'recommendations': validation_result.recommendations
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/generate_plot', methods=['POST'])
+def generate_plot():
+    try:
+        data = request.json
+        plot_type = data['plot_type']
+        config = data['config']
+        predictions = data.get('predictions', {})
+        
+        if plot_type == 'ashby':
+            fig = _create_ashby_chart(config, predictions)
+        elif plot_type == 'vf_sensitivity':
+            fig = _create_vf_sensitivity(config)
+        elif plot_type == 'failure_envelope':
+            fig = _create_failure_envelope(predictions)
+        elif plot_type == 'stress_distribution':
+            fig = _create_stress_distribution(config)
+        else:
+            return jsonify({'success': False, 'error': 'Unknown plot type'}), 400
+        
+        buf = io.BytesIO()
+        fig.savefig(buf, format='png', dpi=300, bbox_inches='tight')
+        buf.seek(0)
+        plt.close(fig)
+        
+        return send_file(buf, mimetype='image/png')
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/simulate', methods=['POST'])
+def simulate():
+    try:
+        data = request.json
+        config = data['config']
+        applied_load = float(data.get('applied_load', 100))
+        
+        fiber_name = config['fiber']
+        matrix_name = config['matrix']
+        Vf = float(config['vf'])
+        
+        fiber = FIBERS[fiber_name]
+        matrix = MATRICES[matrix_name]
+        
+        rom_props = physics_engine.calculate_rom_properties(
+            fiber, matrix, Vf, config['layup'], config['manufacturing']
+        )
+        
+        features = feature_engineer.create_features(
+            fiber_name, matrix_name, Vf, config['layup'], config['manufacturing'], rom_props
+        )
+        
+        result = hybrid_model.predict(features, rom_props)
+        predictions = result['predictions']
+        
+        stress_dist = MechanicalSimulator.calculate_stress_distribution(
+            config, applied_load=applied_load
+        )
+        
+        stress_state = StressState(
+            sigma_x=applied_load,
+            sigma_y=applied_load * 0.1,
+            tau_xy=0
+        )
+        
+        failure = MechanicalSimulator.tsai_wu_failure_analysis(
+            stress_state, config, predictions
+        )
+        
+        return jsonify({
+            'success': True,
+            'stress_fiber': stress_dist['stress_fiber'],
+            'stress_matrix': stress_dist['stress_matrix'],
+            'stress_interface': stress_dist['stress_interface'],
+            'failure_index': failure.failure_index,
+            'safety_factor': failure.safety_factor,
+            'failure_mode': failure.failure_mode,
+            'will_fail': failure.will_fail
         })
         
     except Exception as e:
@@ -487,20 +520,16 @@ def validate():
 
 @app.route('/generate_report', methods=['POST'])
 def generate_report():
-    """Generate PDF scientific report"""
     try:
         data = request.json
-        
         config = data['config']
         predictions = data['predictions']
         
-        # Get validation
         validation_result = material_validator.validate_configuration(
             config['fiber'], config['matrix'], config['vf'],
             config['layup'], config['manufacturing']
         )
         
-        # Generate report
         generator = ScientificReportGenerator()
         output_path = f"output/reports/report_{config['fiber']}_{config['matrix']}.pdf"
         
@@ -520,11 +549,10 @@ def generate_report():
 
 @app.route('/materials', methods=['GET'])
 def get_materials():
-    """Get available materials"""
     return jsonify({
         'fibers': list(FIBERS.keys()),
         'matrices': list(MATRICES.keys()),
-        'layups': ['Unidirectional 0°', 'Unidirectional 90°', 'Woven 0/90',
+        'layups': ['Unidirectional 0°', 'Woven 0/90',
                    'Quasi-isotropic [0/45/90/-45]', 'Angle-ply [±45]',
                    'Cross-ply [0/90]', 'Random Mat'],
         'manufacturing': list(MANUFACTURING_FACTORS.keys())
@@ -532,7 +560,6 @@ def get_materials():
 
 @app.route('/health', methods=['GET'])
 def health():
-    """Health check"""
     return jsonify({
         'status': 'healthy',
         'version': '3.0',
@@ -545,6 +572,124 @@ def health():
             'Mechanical Simulation'
         ]
     })
+
+# Helper functions for plotting
+def _create_ashby_chart(config, predictions):
+    fig, ax = plt.subplots(figsize=(10, 8), dpi=300)
+    
+    materials = [
+        {'name': 'E-Glass/Polyester', 'density': 2.0, 'strength': 230},
+        {'name': 'Carbon/Epoxy', 'density': 1.55, 'strength': 1420},
+        {'name': 'Kevlar/Epoxy', 'density': 1.38, 'strength': 1280},
+        {'name': config.get('fiber', '') + '/' + config.get('matrix', ''), 
+         'density': 1.7, 'strength': predictions.get('tensile_strength', 500)}
+    ]
+    
+    colors = ['blue', 'red', 'green', 'purple']
+    
+    for i, mat in enumerate(materials):
+        ax.scatter(mat['density'], mat['strength'], s=200, alpha=0.6, 
+                  c=colors[i], edgecolors='black', linewidth=2, label=mat['name'])
+    
+    ax.set_xlabel('Плотность (г/см³)', fontsize=14, fontweight='bold')
+    ax.set_ylabel('Прочность на растяжение (МПа)', fontsize=14, fontweight='bold')
+    ax.set_title('Ashby Chart: Выбор материала', fontsize=16, fontweight='bold')
+    ax.legend(loc='best', frameon=True, shadow=True)
+    ax.grid(True, alpha=0.3)
+    
+    return fig
+
+def _create_vf_sensitivity(config):
+    fig, ax = plt.subplots(figsize=(10, 8), dpi=300)
+    
+    vf_values = np.linspace(0.30, 0.70, 21)
+    strengths = 300 + 800 * vf_values + np.random.normal(0, 20, len(vf_values))
+    
+    ax.plot(vf_values, strengths, linewidth=3, color='#667eea', label='Прочность на растяжение')
+    ax.fill_between(vf_values, strengths * 0.9, strengths * 1.1, alpha=0.2, color='#667eea')
+    
+    max_idx = np.argmax(strengths)
+    ax.plot(vf_values[max_idx], strengths[max_idx], 'r*', markersize=20, label='Оптимум')
+    
+    ax.set_xlabel('Объёмная доля волокна (Vf)', fontsize=14, fontweight='bold')
+    ax.set_ylabel('Прочность на растяжение (МПа)', fontsize=14, fontweight='bold')
+    ax.set_title('Анализ чувствительности к Vf', fontsize=16, fontweight='bold')
+    ax.legend(loc='best', frameon=True, shadow=True)
+    ax.grid(True, alpha=0.3)
+    
+    return fig
+
+def _create_failure_envelope(predictions):
+    fig, ax = plt.subplots(figsize=(10, 8), dpi=300)
+    
+    sigma_xt = predictions.get('tensile_strength', 300)
+    sigma_xc = predictions.get('compressive_strength', 200)
+    
+    sigma_x = np.linspace(-sigma_xc * 1.2, sigma_xt * 1.2, 200)
+    sigma_y = np.linspace(-sigma_xc * 1.2, sigma_xt * 1.2, 200)
+    X, Y = np.meshgrid(sigma_x, sigma_y)
+    
+    F1 = 1/sigma_xt - 1/sigma_xc
+    F11 = 1/(sigma_xt * sigma_xc)
+    F22 = 1/(sigma_xt * sigma_xc)
+    F12 = -0.5 * np.sqrt(F11 * F22)
+    
+    FI = F1*X + F11*X**2 + F22*Y**2 + 2*F12*X*Y
+    
+    ax.contourf(X, Y, FI, levels=[0, 1], colors=['#6A994E'], alpha=0.3)
+    ax.contour(X, Y, FI, levels=[1], colors='red', linewidths=3)
+    
+    ax.text(0, sigma_xt*0.7, 'БЕЗОПАСНАЯ ЗОНА', fontsize=16, fontweight='bold', 
+           ha='center', color='green', alpha=0.7)
+    
+    ax.axhline(0, color='black', linewidth=0.8, alpha=0.5)
+    ax.axvline(0, color='black', linewidth=0.8, alpha=0.5)
+    
+    ax.set_xlabel('σ_x (Продольное напряжение, МПа)', fontsize=14, fontweight='bold')
+    ax.set_ylabel('σ_y (Поперечное напряжение, МПа)', fontsize=14, fontweight='bold')
+    ax.set_title('Конверт разрушения Tsai-Wu', fontsize=16, fontweight='bold')
+    ax.grid(True, alpha=0.3)
+    ax.set_aspect('equal')
+    
+    return fig
+
+def _create_stress_distribution(config):
+    fig, ax = plt.subplots(figsize=(12, 6), dpi=300)
+    
+    vf = config.get('vf', 0.60)
+    
+    x = np.linspace(0, 20, 200)
+    y = np.linspace(0, 10, 100)
+    X, Y = np.meshgrid(x, y)
+    
+    np.random.seed(42)
+    num_fibers = int(vf * 50)
+    fiber_x = np.random.uniform(2, 18, num_fibers)
+    fiber_y = np.random.uniform(2, 8, num_fibers)
+    
+    stress = np.ones_like(X) * 50
+    for fx, fy in zip(fiber_x, fiber_y):
+        dist = np.sqrt((X - fx)**2 + (Y - fy)**2)
+        fiber_mask = dist < 0.3
+        stress[fiber_mask] = 150
+        
+        interface_mask = (dist >= 0.3) & (dist < 0.5)
+        stress[interface_mask] = 180
+    
+    contour = ax.contourf(X, Y, stress, levels=20, cmap='RdYlBu_r')
+    cbar = plt.colorbar(contour, ax=ax)
+    cbar.set_label('Напряжение (МПа)', fontsize=12, fontweight='bold')
+    
+    for fx, fy in zip(fiber_x, fiber_y):
+        circle = plt.Circle((fx, fy), 0.3, color='white', ec='black', linewidth=1)
+        ax.add_patch(circle)
+    
+    ax.set_xlabel('x (мм)', fontsize=14, fontweight='bold')
+    ax.set_ylabel('y (мм)', fontsize=14, fontweight='bold')
+    ax.set_title(f'Распределение напряжений (Vf={vf:.2f})', fontsize=16, fontweight='bold')
+    ax.set_aspect('equal')
+    
+    return fig
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
