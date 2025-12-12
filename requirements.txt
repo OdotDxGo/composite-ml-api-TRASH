@@ -1,3 +1,15 @@
 Flask==3.0.0
-Flask-CORS==4.0.0
+flask-cors==4.0.0
+numpy==1.24.3
+pandas==2.0.3
+scikit-learn==1.3.0
+scipy==1.11.2
+joblib==1.3.2
 gunicorn==21.2.0
+```
+
+---
+
+## 5️⃣ **Procfile** (для Railway)
+```
+web: gunicorn app:app

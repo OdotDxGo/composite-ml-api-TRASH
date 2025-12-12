@@ -1,248 +1,587 @@
-"""
-Composite Materials Property Prediction API
-Version: 2.0 - Production Ready for Railway.com
-Method: Empirical formulas based on composite mechanics
-"""
-
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
+import numpy as np
+import pickle
 import os
-import sys
-from datetime import datetime
+from dataclasses import dataclass
+from typing import Dict, List, Tuple
+import warnings
+warnings.filterwarnings('ignore')
 
 app = Flask(__name__, static_folder='static')
 CORS(app)
 
-print("="*80, file=sys.stderr)
-print(f"🚀 Composite ML API v2.0 - Starting...", file=sys.stderr)
-print(f"📅 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", file=sys.stderr)
-print("="*80, file=sys.stderr)
+# ===========================
+# МАТЕРИАЛЬНЫЕ КОНСТАНТЫ
+# ===========================
 
-# Material database (all values at Vf=0.6)
-MATERIALS_DB = {
-    'Carbon': {
-        'Epoxy': {'ts': 1500, 'tm': 130, 'cs': 1200, 'fs': 1400, 'fm': 125, 'ilss': 75, 'ie': 18},
-        'Polyester': {'ts': 1200, 'tm': 110, 'cs': 950, 'fs': 1150, 'fm': 105, 'ilss': 62, 'ie': 15},
-        'Vinyl_ester': {'ts': 1350, 'tm': 120, 'cs': 1050, 'fs': 1250, 'fm': 115, 'ilss': 68, 'ie': 16},
-        'PEEK': {'ts': 1800, 'tm': 145, 'cs': 1400, 'fs': 1650, 'fm': 138, 'ilss': 88, 'ie': 25},
-        'PA6': {'ts': 1400, 'tm': 125, 'cs': 1100, 'fs': 1300, 'fm': 120, 'ilss': 70, 'ie': 20}
-    },
-    'Glass': {
-        'Epoxy': {'ts': 420, 'tm': 26, 'cs': 280, 'fs': 550, 'fm': 24, 'ilss': 40, 'ie': 27},
-        'Polyester': {'ts': 350, 'tm': 22, 'cs': 230, 'fs': 450, 'fm': 20, 'ilss': 32, 'ie': 22},
-        'Vinyl_ester': {'ts': 385, 'tm': 24, 'cs': 255, 'fs': 500, 'fm': 22, 'ilss': 36, 'ie': 24},
-        'PEEK': {'ts': 480, 'tm': 30, 'cs': 320, 'fs': 620, 'fm': 28, 'ilss': 46, 'ie': 32},
-        'PA6': {'ts': 400, 'tm': 25, 'cs': 270, 'fs': 520, 'fm': 23, 'ilss': 38, 'ie': 26}
-    },
-    'Aramid': {
-        'Epoxy': {'ts': 560, 'tm': 32, 'cs': 180, 'fs': 480, 'fm': 28, 'ilss': 35, 'ie': 42},
-        'Polyester': {'ts': 480, 'tm': 28, 'cs': 150, 'fs': 410, 'fm': 24, 'ilss': 28, 'ie': 35},
-        'Vinyl_ester': {'ts': 520, 'tm': 30, 'cs': 165, 'fs': 445, 'fm': 26, 'ilss': 31, 'ie': 38},
-        'PEEK': {'ts': 620, 'tm': 36, 'cs': 200, 'fs': 530, 'fm': 32, 'ilss': 40, 'ie': 48},
-        'PA6': {'ts': 540, 'tm': 31, 'cs': 175, 'fs': 460, 'fm': 27, 'ilss': 33, 'ie': 40}
-    },
-    'Basalt': {
-        'Epoxy': {'ts': 380, 'tm': 24, 'cs': 250, 'fs': 490, 'fm': 22, 'ilss': 38, 'ie': 24},
-        'Polyester': {'ts': 320, 'tm': 20, 'cs': 210, 'fs': 410, 'fm': 18, 'ilss': 30, 'ie': 20},
-        'Vinyl_ester': {'ts': 350, 'tm': 22, 'cs': 230, 'fs': 450, 'fm': 20, 'ilss': 34, 'ie': 22},
-        'PEEK': {'ts': 430, 'tm': 27, 'cs': 280, 'fs': 550, 'fm': 25, 'ilss': 43, 'ie': 28},
-        'PA6': {'ts': 365, 'tm': 23, 'cs': 240, 'fs': 470, 'fm': 21, 'ilss': 36, 'ie': 23}
-    },
-    'Natural': {
-        'Epoxy': {'ts': 55, 'tm': 2.5, 'cs': 45, 'fs': 85, 'fm': 3.5, 'ilss': 12, 'ie': 10},
-        'Polyester': {'ts': 45, 'tm': 2.0, 'cs': 38, 'fs': 70, 'fm': 2.8, 'ilss': 9, 'ie': 8},
-        'Vinyl_ester': {'ts': 50, 'tm': 2.2, 'cs': 41, 'fs': 77, 'fm': 3.1, 'ilss': 10, 'ie': 9},
-        'PEEK': {'ts': 65, 'tm': 3.0, 'cs': 52, 'fs': 95, 'fm': 4.0, 'ilss': 14, 'ie': 12},
-        'PA6': {'ts': 52, 'tm': 2.4, 'cs': 43, 'fs': 80, 'fm': 3.3, 'ilss': 11, 'ie': 9}
-    }
+@dataclass
+class FiberProperties:
+    E: float  # Модуль упругости (GPa)
+    sigma: float  # Прочность (MPa)
+    rho: float  # Плотность (g/cm³)
+    G: float  # Модуль сдвига (GPa)
+    epsilon_f: float  # Деформация разрушения (%)
+    U_f: float  # Удельная энергия разрушения (J)
+
+@dataclass
+class MatrixProperties:
+    E: float
+    sigma: float
+    rho: float
+    G: float
+    epsilon_f: float
+    U_m: float
+
+# Библиотека материалов
+FIBERS = {
+    'Carbon T300': FiberProperties(230, 3530, 1.76, 95, 1.5, 25),
+    'E-Glass': FiberProperties(73, 3450, 2.54, 30, 4.7, 18),
+    'Kevlar 49': FiberProperties(131, 3620, 1.44, 52, 2.8, 35),
+    'Basalt': FiberProperties(89, 4840, 2.75, 35, 3.1, 22),
+    'Flax': FiberProperties(58, 1100, 1.50, 22, 2.7, 12)
 }
 
-LAYUP_FACTORS = {
-    'UD 0°': 1.0,
-    'UD 90°': 0.4,
-    'Woven': 0.8,
-    '[0/90]2s': 0.85,
-    '[0/45/90/-45]s': 0.75,
-    '[±45]2s': 0.65,
-    'Quasi-isotropic': 0.7
+MATRICES = {
+    'Epoxy': MatrixProperties(3.2, 78, 1.20, 1.2, 4.5, 2.8),
+    'Polyester': MatrixProperties(3.5, 55, 1.15, 1.3, 2.8, 2.1),
+    'Vinyl Ester': MatrixProperties(3.4, 82, 1.14, 1.3, 5.2, 2.5),
+    'PEEK': MatrixProperties(3.9, 105, 1.32, 1.4, 50, 3.5),
+    'Polyamide 6': MatrixProperties(2.8, 82, 1.14, 1.0, 100, 2.0)
 }
 
+# Коэффициенты эффективности
+EFFICIENCY_FACTORS = {
+    'eta_L': 0.95,
+    'eta_T': 0.40,
+    'eta_strength': 0.90,
+    'eta_comp': 0.70,
+    'eta_interface': 0.85
+}
+
+# Коэффициенты производства
 MANUFACTURING_FACTORS = {
-    'Autoclave': 1.0,
-    'VARTM': 0.95,
-    'Hand_layup': 0.85,
-    'Pultrusion': 0.98,
-    'RTM': 0.97,
-    'Compression_molding': 0.93,
-    'Filament_winding': 0.96
+    'Autoclave': 1.00,
+    'VARTM': 0.93,
+    'RTM': 0.88,
+    'Compression Molding': 0.85,
+    'Hand Layup': 0.75,
+    'Filament Winding': 0.90,
+    'Pultrusion': 0.92
 }
 
+# ===========================
+# PHYSICS-BASED CALCULATIONS
+# ===========================
 
-def predict_properties(fiber_type, matrix_type, fiber_vf, layup, manufacturing):
-    fiber = fiber_type if fiber_type in MATERIALS_DB else 'Carbon'
-    matrix = matrix_type if matrix_type in MATERIALS_DB.get(fiber, {}) else 'Epoxy'
-    base = MATERIALS_DB[fiber].get(matrix, MATERIALS_DB['Carbon']['Epoxy'])
+class PhysicsEngine:
+    """Эмпирические формулы Rule of Mixtures"""
     
-    vf_factor = fiber_vf / 0.6
-    layup_factor = LAYUP_FACTORS.get(layup, 0.85)
-    manuf_factor = MANUFACTURING_FACTORS.get(manufacturing, 0.95)
-    total_factor = vf_factor * layup_factor * manuf_factor
-    
-    return {
-        'tensile_strength_MPa': round(base['ts'] * total_factor, 1),
-        'tensile_modulus_GPa': round(base['tm'] * total_factor, 1),
-        'compressive_strength_MPa': round(base['cs'] * total_factor, 1),
-        'flexural_strength_MPa': round(base['fs'] * total_factor, 1),
-        'flexural_modulus_GPa': round(base['fm'] * total_factor, 1),
-        'ILSS_MPa': round(base['ilss'] * total_factor, 1),
-        'impact_energy_J': round(base['ie'] * total_factor, 1)
-    }
+    @staticmethod
+    def calculate_rom_properties(fiber: FiberProperties, matrix: MatrixProperties, 
+                                 Vf: float, layup: str, manufacturing: str) -> Dict[str, float]:
+        """
+        Расчёт свойств по правилу смесей
+        
+        Returns:
+            dict: 7 механических свойств + промежуточные значения
+        """
+        
+        # Коэффициенты
+        eta_L = EFFICIENCY_FACTORS['eta_L']
+        eta_T = EFFICIENCY_FACTORS['eta_T']
+        eta_strength = EFFICIENCY_FACTORS['eta_strength']
+        eta_comp = EFFICIENCY_FACTORS['eta_comp']
+        eta_interface = EFFICIENCY_FACTORS['eta_interface']
+        eta_mfg = MANUFACTURING_FACTORS[manufacturing]
+        
+        # === UNIDIRECTIONAL PROPERTIES ===
+        
+        # 1. Longitudinal Modulus (GPa)
+        E_L = eta_L * fiber.E * Vf + matrix.E * (1 - Vf)
+        
+        # 2. Transverse Modulus (GPa)
+        E_T = 1 / (Vf / (eta_T * fiber.E) + (1 - Vf) / matrix.E)
+        
+        # 3. Tensile Strength (MPa)
+        sigma_m_prime = 0.45 * matrix.sigma  # Matrix stress at fiber failure
+        sigma_UTS = eta_strength * fiber.sigma * Vf + sigma_m_prime * (1 - Vf)
+        
+        # 4. Compressive Strength (MPa)
+        sigma_comp_buckling = matrix.G / (1 - Vf)
+        sigma_comp_crushing = fiber.sigma * Vf * 0.8  # Fibers weaker in compression
+        sigma_comp = eta_comp * min(sigma_comp_buckling, sigma_comp_crushing)
+        
+        # 5. Flexural Strength (MPa)
+        modulus_ratio = fiber.E / matrix.E
+        sigma_flex = 1.25 * sigma_UTS * (1 + 0.1 * modulus_ratio) ** (-0.3)
+        
+        # 6. Flexural Modulus (GPa)
+        E_flex = 1.05 * E_L * (1 + 0.05 * Vf)
+        
+        # 7. Interlaminar Shear Strength (MPa)
+        tau_m = 0.50 * matrix.sigma  # Matrix shear strength
+        tau_ILSS = tau_m * (1 - 0.5 * Vf) * eta_interface
+        
+        # 8. Impact Energy (J)
+        eta_f = 0.75
+        eta_m = 0.70
+        U_interface_fraction = 0.20
+        U_impact = (fiber.U_f * Vf * eta_f + 
+                   matrix.U_m * (1 - Vf) * eta_m) * (1 + U_interface_fraction)
+        
+        # === LAYUP CORRECTIONS ===
+        
+        layup_factors = {
+            'Unidirectional 0°': {'k_E': 1.00, 'k_sigma': 1.00},
+            'Unidirectional 90°': {'k_E': E_T/E_L, 'k_sigma': 0.15},
+            'Woven 0/90': {'k_E': 0.65, 'k_sigma': 0.70},
+            'Quasi-isotropic [0/45/90/-45]': {
+                'k_E': 3/8 + Vf/4 + 1/8 * (E_T/E_L),
+                'k_sigma': 3/8 + Vf/4 + 1/8 * 0.15
+            },
+            'Angle-ply [±45]': {'k_E': 0.35, 'k_sigma': 0.40},
+            'Cross-ply [0/90]': {'k_E': 0.55, 'k_sigma': 0.60},
+            'Random Mat': {'k_E': 0.30, 'k_sigma': 0.35}
+        }
+        
+        k_E = layup_factors[layup]['k_E']
+        k_sigma = layup_factors[layup]['k_sigma']
+        
+        # Apply layup corrections
+        E_L_layup = E_L * k_E
+        sigma_UTS_layup = sigma_UTS * k_sigma
+        sigma_comp_layup = sigma_comp * k_sigma * 0.9
+        sigma_flex_layup = sigma_flex * k_sigma * 1.15
+        E_flex_layup = E_flex * k_E * 0.95
+        
+        # === MANUFACTURING CORRECTIONS ===
+        
+        # Additional empirical corrections from database fitting
+        correction_factors = {
+            'tensile_strength': 0.262,
+            'tensile_modulus': 0.72,
+            'compressive_strength': 0.202,
+            'flexural_strength': 0.289,
+            'flexural_modulus': 0.60,
+            'ilss': 1.49,
+            'impact': 0.98
+        }
+        
+        # Final properties
+        properties = {
+            # Main predictions
+            'tensile_strength': sigma_UTS_layup * eta_mfg * correction_factors['tensile_strength'],
+            'tensile_modulus': E_L_layup * eta_mfg * correction_factors['tensile_modulus'],
+            'compressive_strength': sigma_comp_layup * eta_mfg * correction_factors['compressive_strength'],
+            'flexural_strength': sigma_flex_layup * eta_mfg * correction_factors['flexural_strength'],
+            'flexural_modulus': E_flex_layup * eta_mfg * correction_factors['flexural_modulus'],
+            'ilss': tau_ILSS * eta_mfg * correction_factors['ilss'],
+            'impact_energy': U_impact * eta_mfg * correction_factors['impact'],
+            
+            # Intermediate values for feature engineering
+            'E_L_UD': E_L,
+            'E_T_UD': E_T,
+            'sigma_UTS_UD': sigma_UTS,
+            'E_f_E_m_ratio': fiber.E / matrix.E,
+            'sigma_f_sigma_m_ratio': fiber.sigma / matrix.sigma,
+            'rho_f_rho_m_ratio': fiber.rho / matrix.rho,
+            'G_f_G_m_ratio': fiber.G / matrix.G,
+        }
+        
+        return properties
 
+# ===========================
+# FEATURE ENGINEERING
+# ===========================
+
+class FeatureEngineer:
+    """Создание physics-informed features для ML"""
+    
+    @staticmethod
+    def create_features(fiber_name: str, matrix_name: str, Vf: float, 
+                       layup: str, manufacturing: str, 
+                       rom_properties: Dict[str, float]) -> np.ndarray:
+        """
+        Создаёт 26 features для ML модели:
+        - 5 base features
+        - 7 ROM predictions
+        - 4 constituent ratios
+        - 3 Vf transformations
+        - 7 interaction terms
+        """
+        
+        features = []
+        
+        # === BASE FEATURES (5) ===
+        fiber_encoding = {'Carbon T300': 0, 'E-Glass': 1, 'Kevlar 49': 2, 
+                         'Basalt': 3, 'Flax': 4}
+        matrix_encoding = {'Epoxy': 0, 'Polyester': 1, 'Vinyl Ester': 2, 
+                          'PEEK': 3, 'Polyamide 6': 4}
+        layup_encoding = {
+            'Unidirectional 0°': 0, 'Unidirectional 90°': 1, 'Woven 0/90': 2,
+            'Quasi-isotropic [0/45/90/-45]': 3, 'Angle-ply [±45]': 4,
+            'Cross-ply [0/90]': 5, 'Random Mat': 6
+        }
+        mfg_encoding = {'Autoclave': 0, 'VARTM': 1, 'RTM': 2, 
+                       'Compression Molding': 3, 'Hand Layup': 4,
+                       'Filament Winding': 5, 'Pultrusion': 6}
+        
+        features.extend([
+            fiber_encoding[fiber_name],
+            matrix_encoding[matrix_name],
+            Vf,
+            layup_encoding[layup],
+            mfg_encoding[manufacturing]
+        ])
+        
+        # === PHYSICS-DERIVED FEATURES (7) - ROM predictions ===
+        features.extend([
+            rom_properties['tensile_strength'],
+            rom_properties['tensile_modulus'],
+            rom_properties['compressive_strength'],
+            rom_properties['flexural_strength'],
+            rom_properties['flexural_modulus'],
+            rom_properties['ilss'],
+            rom_properties['impact_energy']
+        ])
+        
+        # === CONSTITUENT PROPERTY RATIOS (4) ===
+        features.extend([
+            rom_properties['E_f_E_m_ratio'],
+            rom_properties['sigma_f_sigma_m_ratio'],
+            rom_properties['rho_f_rho_m_ratio'],
+            rom_properties['G_f_G_m_ratio']
+        ])
+        
+        # === VOLUME FRACTION TRANSFORMATIONS (3) ===
+        features.extend([
+            Vf ** 2,
+            Vf ** 3,
+            1 / (1 - Vf + 1e-6)  # Avoid division by zero
+        ])
+        
+        # === INTERACTION TERMS (7) ===
+        features.extend([
+            Vf * rom_properties['E_f_E_m_ratio'],
+            Vf * rom_properties['sigma_f_sigma_m_ratio'],
+            rom_properties['tensile_modulus'] ** 2,
+            rom_properties['tensile_strength'] * rom_properties['tensile_modulus'],
+            Vf * rom_properties['E_L_UD'],
+            (1 - Vf) * rom_properties['E_T_UD'],
+            rom_properties['E_f_E_m_ratio'] * rom_properties['sigma_f_sigma_m_ratio']
+        ])
+        
+        return np.array(features).reshape(1, -1)
+
+# ===========================
+# HYBRID ML MODEL
+# ===========================
+
+class HybridPIRF:
+    """Physics-Informed Random Forest - Гибридная модель"""
+    
+    def __init__(self):
+        self.models = {}  # Словарь моделей для каждого свойства
+        self.scaler = None
+        self.feature_names = None
+        
+    def load_models(self):
+        """Загрузка обученных моделей"""
+        model_path = 'models/hybrid_model.pkl'
+        scaler_path = 'models/scaler.pkl'
+        
+        if os.path.exists(model_path):
+            with open(model_path, 'rb') as f:
+                self.models = pickle.load(f)
+            print(f"✓ Loaded {len(self.models)} trained models")
+        else:
+            print("⚠ No trained models found. Using physics-based predictions only.")
+            
+        if os.path.exists(scaler_path):
+            with open(scaler_path, 'rb') as f:
+                self.scaler = pickle.load(f)
+            print("✓ Loaded feature scaler")
+        else:
+            print("⚠ No scaler found.")
+    
+    def predict(self, features: np.ndarray, rom_predictions: Dict[str, float]) -> Dict[str, any]:
+        """
+        Гибридное предсказание с uncertainty quantification
+        
+        Returns:
+            dict: {
+                'predictions': {...},  # Point predictions
+                'uncertainty': {...},  # Prediction intervals
+                'method_weights': {...}  # Contribution of each method
+            }
+        """
+        
+        if not self.models:
+            # Fallback to pure ROM if no models loaded
+            return {
+                'predictions': rom_predictions,
+                'uncertainty': {k: {'lower': v*0.85, 'upper': v*1.15} 
+                               for k, v in rom_predictions.items()},
+                'method_weights': {'physics': 1.0, 'ml': 0.0},
+                'confidence': 'low'
+            }
+        
+        # Scale features
+        if self.scaler:
+            features_scaled = self.scaler.transform(features)
+        else:
+            features_scaled = features
+        
+        predictions = {}
+        uncertainties = {}
+        
+        property_names = ['tensile_strength', 'tensile_modulus', 'compressive_strength',
+                         'flexural_strength', 'flexural_modulus', 'ilss', 'impact_energy']
+        
+        for prop in property_names:
+            if prop in self.models:
+                model = self.models[prop]
+                
+                # Ensemble prediction (multiple models)
+                ml_pred = model['rf'].predict(features_scaled)[0]
+                
+                # Uncertainty from RF trees
+                tree_predictions = np.array([tree.predict(features_scaled)[0] 
+                                            for tree in model['rf'].estimators_])
+                ml_std = np.std(tree_predictions)
+                
+                # Physics prediction
+                physics_pred = rom_predictions[prop]
+                physics_std = physics_pred * 0.10  # Assume 10% uncertainty for physics
+                
+                # Adaptive confidence weighting
+                # Higher ML uncertainty → trust physics more
+                alpha = 2.5
+                w_ml = np.exp(-alpha * ml_std**2)
+                w_physics = np.exp(-alpha * physics_std**2)
+                w_total = w_ml + w_physics
+                
+                w_ml_norm = w_ml / w_total
+                w_physics_norm = w_physics / w_total
+                
+                # Hybrid prediction
+                hybrid_pred = w_ml_norm * ml_pred + w_physics_norm * physics_pred
+                
+                # Combined uncertainty
+                hybrid_std = np.sqrt(w_ml_norm**2 * ml_std**2 + 
+                                    w_physics_norm**2 * physics_std**2)
+                
+                predictions[prop] = float(hybrid_pred)
+                uncertainties[prop] = {
+                    'lower': float(hybrid_pred - 1.96 * hybrid_std),  # 95% CI
+                    'upper': float(hybrid_pred + 1.96 * hybrid_std),
+                    'std': float(hybrid_std)
+                }
+                
+            else:
+                # Fallback to ROM
+                predictions[prop] = rom_predictions[prop]
+                uncertainties[prop] = {
+                    'lower': rom_predictions[prop] * 0.85,
+                    'upper': rom_predictions[prop] * 1.15,
+                    'std': rom_predictions[prop] * 0.10
+                }
+        
+        return {
+            'predictions': predictions,
+            'uncertainty': uncertainties,
+            'method_weights': {
+                'physics': float(np.mean([w_physics_norm for _ in property_names])),
+                'ml': float(np.mean([w_ml_norm for _ in property_names]))
+            },
+            'confidence': 'high' if self.models else 'medium'
+        }
+
+# ===========================
+# INITIALIZE
+# ===========================
+
+physics_engine = PhysicsEngine()
+feature_engineer = FeatureEngineer()
+hybrid_model = HybridPIRF()
+
+# Load models on startup
+hybrid_model.load_models()
+
+# ===========================
+# API ENDPOINTS
+# ===========================
 
 @app.route('/')
-def home():
-    try:
-        return send_from_directory('static', 'index.html')
-    except:
-        return jsonify({'status': 'online', 'api_docs': '/api'})
+def index():
+    """Serve frontend"""
+    return send_from_directory('static', 'index.html')
 
-
-@app.route('/health')
-@app.route('/api/health')
-def health():
-    return jsonify({
-        'status': 'healthy',
-        'version': '2.0',
-        'method': 'empirical_formulas',
-        'timestamp': datetime.now().isoformat()
-    })
-
-
-@app.route('/api')
-def api_info():
-    return jsonify({
-        'name': 'Composite Materials Property Prediction API',
-        'version': '2.0',
-        'status': 'active',
-        'method': 'Empirical formulas with rule of mixtures',
-        'endpoints': {
-            'GET /': 'Web interface',
-            'GET /health': 'Health check',
-            'GET /api': 'API information',
-            'POST /api/predict': 'Single prediction',
-            'POST /api/predict/batch': 'Batch predictions',
-            'GET /api/materials': 'Material database',
-            'GET /api/options': 'Available options'
-        }
-    })
-
-
-@app.route('/api/predict', methods=['POST'])
+@app.route('/predict', methods=['POST'])
 def predict():
+    """
+    Main prediction endpoint
+    
+    Request JSON:
+    {
+        "fiber": "E-Glass",
+        "matrix": "Polyester",
+        "vf": 0.60,
+        "layup": "Quasi-isotropic [0/45/90/-45]",
+        "manufacturing": "Compression Molding"
+    }
+    
+    Response JSON:
+    {
+        "success": true,
+        "predictions": {...},
+        "uncertainty": {...},
+        "rom_predictions": {...},
+        "method": "hybrid",
+        "confidence": "high"
+    }
+    """
     try:
-        data = request.get_json()
+        data = request.json
         
-        fiber_type = data.get('fiber_type', 'Carbon')
-        matrix_type = data.get('matrix_type', 'Epoxy')
-        fiber_vf = float(data.get('fiber_volume_fraction', 0.6))
-        layup = data.get('layup', 'UD 0°')
-        manufacturing = data.get('manufacturing', 'Autoclave')
+        # Validate inputs
+        fiber_name = data['fiber']
+        matrix_name = data['matrix']
+        Vf = float(data['vf'])
+        layup = data['layup']
+        manufacturing = data['manufacturing']
         
-        if not (0.3 <= fiber_vf <= 0.7):
-            return jsonify({'success': False, 'error': 'Fiber volume fraction must be between 0.3 and 0.7'}), 400
+        if fiber_name not in FIBERS:
+            return jsonify({'success': False, 'error': f'Unknown fiber: {fiber_name}'}), 400
+        if matrix_name not in MATRICES:
+            return jsonify({'success': False, 'error': f'Unknown matrix: {matrix_name}'}), 400
+        if not (0.25 <= Vf <= 0.75):
+            return jsonify({'success': False, 'error': 'Vf must be between 0.25 and 0.75'}), 400
         
-        predictions = predict_properties(fiber_type, matrix_type, fiber_vf, layup, manufacturing)
+        fiber = FIBERS[fiber_name]
+        matrix = MATRICES[matrix_name]
         
-        return jsonify({
+        # Step 1: Calculate ROM properties
+        rom_props = physics_engine.calculate_rom_properties(
+            fiber, matrix, Vf, layup, manufacturing
+        )
+        
+        # Step 2: Create features
+        features = feature_engineer.create_features(
+            fiber_name, matrix_name, Vf, layup, manufacturing, rom_props
+        )
+        
+        # Step 3: Hybrid prediction
+        result = hybrid_model.predict(features, rom_props)
+        
+        # Format response
+        response = {
             'success': True,
-            'method': 'empirical_formulas',
-            'input': {
-                'fiber_type': fiber_type,
-                'matrix_type': matrix_type,
-                'fiber_volume_fraction': fiber_vf,
+            'predictions': result['predictions'],
+            'uncertainty': result['uncertainty'],
+            'rom_predictions': {
+                'tensile_strength': rom_props['tensile_strength'],
+                'tensile_modulus': rom_props['tensile_modulus'],
+                'compressive_strength': rom_props['compressive_strength'],
+                'flexural_strength': rom_props['flexural_strength'],
+                'flexural_modulus': rom_props['flexural_modulus'],
+                'ilss': rom_props['ilss'],
+                'impact_energy': rom_props['impact_energy']
+            },
+            'method': 'hybrid' if hybrid_model.models else 'physics_only',
+            'method_weights': result['method_weights'],
+            'confidence': result['confidence'],
+            'inputs': {
+                'fiber': fiber_name,
+                'matrix': matrix_name,
+                'vf': Vf,
                 'layup': layup,
                 'manufacturing': manufacturing
-            },
-            'predictions': predictions
-        })
+            }
+        }
+        
+        return jsonify(response)
+        
     except Exception as e:
-        print(f"❌ Error: {e}", file=sys.stderr)
-        return jsonify({'success': False, 'error': 'Internal server error'}), 500
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
-
-@app.route('/api/predict/batch', methods=['POST'])
-def predict_batch():
+@app.route('/compare_methods', methods=['POST'])
+def compare_methods():
+    """
+    Compare predictions from different methods
+    """
     try:
-        data = request.get_json()
-        samples = data.get('samples', [])
+        data = request.json
         
-        if not samples:
-            return jsonify({'success': False, 'error': 'No samples provided'}), 400
+        fiber_name = data['fiber']
+        matrix_name = data['matrix']
+        Vf = float(data['vf'])
+        layup = data['layup']
+        manufacturing = data['manufacturing']
         
-        results = []
-        for idx, sample in enumerate(samples):
-            try:
-                fiber_type = sample.get('fiber_type', 'Carbon')
-                matrix_type = sample.get('matrix_type', 'Epoxy')
-                fiber_vf = float(sample.get('fiber_volume_fraction', 0.6))
-                layup = sample.get('layup', 'UD 0°')
-                manufacturing = sample.get('manufacturing', 'Autoclave')
-                
-                predictions = predict_properties(fiber_type, matrix_type, fiber_vf, layup, manufacturing)
-                
-                results.append({
-                    'index': idx,
-                    'input': sample,
-                    'predictions': predictions,
-                    'success': True
-                })
-            except Exception as e:
-                results.append({
-                    'index': idx,
-                    'input': sample,
-                    'success': False,
-                    'error': str(e)
-                })
+        fiber = FIBERS[fiber_name]
+        matrix = MATRICES[matrix_name]
         
-        return jsonify({'success': True, 'method': 'empirical_formulas', 'count': len(results), 'results': results})
+        # ROM predictions
+        rom_props = physics_engine.calculate_rom_properties(
+            fiber, matrix, Vf, layup, manufacturing
+        )
+        
+        # Features for ML
+        features = feature_engineer.create_features(
+            fiber_name, matrix_name, Vf, layup, manufacturing, rom_props
+        )
+        
+        # Hybrid prediction
+        hybrid_result = hybrid_model.predict(features, rom_props)
+        
+        response = {
+            'success': True,
+            'methods': {
+                'empirical': {
+                    'predictions': rom_props,
+                    'description': 'Pure physics-based Rule of Mixtures'
+                },
+                'hybrid': {
+                    'predictions': hybrid_result['predictions'],
+                    'uncertainty': hybrid_result['uncertainty'],
+                    'description': 'Physics-Informed Random Forest (PIRF)'
+                }
+            },
+            'improvement': {
+                # Calculate improvement metrics (if validation data available)
+            }
+        }
+        
+        return jsonify(response)
+        
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-
-@app.route('/api/materials')
+@app.route('/materials', methods=['GET'])
 def get_materials():
+    """Get available materials"""
     return jsonify({
-        'success': True,
-        'database': MATERIALS_DB,
-        'note': 'Base values at fiber volume fraction = 0.6'
+        'fibers': list(FIBERS.keys()),
+        'matrices': list(MATRICES.keys()),
+        'layups': list(MANUFACTURING_FACTORS.keys()),
+        'manufacturing': list(MANUFACTURING_FACTORS.keys())
     })
 
-
-@app.route('/api/options')
-def get_options():
+@app.route('/health', methods=['GET'])
+def health():
+    """Health check"""
     return jsonify({
-        'success': True,
-        'options': {
-            'fiber_types': list(MATERIALS_DB.keys()),
-            'matrix_types': ['Epoxy', 'Polyester', 'Vinyl_ester', 'PEEK', 'PA6'],
-            'layups': list(LAYUP_FACTORS.keys()),
-            'manufacturing': list(MANUFACTURING_FACTORS.keys()),
-            'fiber_volume_fraction': {'min': 0.3, 'max': 0.7, 'recommended': 0.6}
-        },
-        'factors': {
-            'layup': LAYUP_FACTORS,
-            'manufacturing': MANUFACTURING_FACTORS
-        }
+        'status': 'healthy',
+        'version': '2.0',
+        'models_loaded': len(hybrid_model.models) > 0,
+        'num_models': len(hybrid_model.models)
     })
-
-
-print("="*80, file=sys.stderr)
-print("✅ API Ready!", file=sys.stderr)
-print("Method: Empirical formulas + Rule of mixtures", file=sys.stderr)
-print(f"Materials: {len(MATERIALS_DB)} fiber types × 5 matrix types = 25 combinations", file=sys.stderr)
-print("="*80, file=sys.stderr)
-
 
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', 5000))
+    port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)

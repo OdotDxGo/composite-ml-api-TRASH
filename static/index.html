@@ -1,10 +1,9 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Composite Materials ML Predictor</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <title>Hybrid PIRF - Composite Materials Property Prediction</title>
     <style>
         * {
             margin: 0;
@@ -13,157 +12,85 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
+            color: #333;
         }
 
         .container {
             max-width: 1400px;
             margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
         }
 
         .header {
-            background: rgba(255, 255, 255, 0.95);
-            padding: 30px;
-            border-radius: 20px;
-            margin-bottom: 30px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            position: relative;
-        }
-
-        .lang-switch {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            display: flex;
-            gap: 10px;
-        }
-
-        .lang-btn {
-            padding: 8px 16px;
-            border: 2px solid #667eea;
-            background: white;
-            color: #667eea;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.3s;
-        }
-
-        .lang-btn.active {
-            background: #667eea;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
+            padding: 30px;
+            text-align: center;
         }
 
-        .lang-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-        }
-
-        h1 {
-            color: #2d3748;
+        .header h1 {
             font-size: 2.5em;
             margin-bottom: 10px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
         }
 
-        .subtitle {
-            color: #718096;
-            font-size: 1.1em;
+        .badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            margin: 5px;
+            backdrop-filter: blur(10px);
         }
 
-        .main-grid {
+        .main-content {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 30px;
-            margin-bottom: 30px;
-        }
-
-        @media (max-width: 1200px) {
-            .main-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .card {
-            background: rgba(255, 255, 255, 0.95);
             padding: 30px;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
         }
 
-        .card h2 {
-            color: #2d3748;
+        .panel {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .panel h2 {
+            color: #667eea;
             margin-bottom: 20px;
-            font-size: 1.8em;
-        }
-
-        .info-box {
-            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            border-left: 4px solid #667eea;
-        }
-
-        .info-box p {
-            color: #4a5568;
-            line-height: 1.6;
-            margin: 5px 0;
+            font-size: 1.5em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
         .form-group {
-            margin-bottom: 25px;
+            margin-bottom: 20px;
         }
 
         label {
             display: block;
-            color: #2d3748;
             font-weight: 600;
             margin-bottom: 8px;
-            font-size: 1.05em;
-        }
-
-        .tooltip {
-            display: inline-block;
-            margin-left: 8px;
-            width: 18px;
-            height: 18px;
-            background: #667eea;
-            color: white;
-            border-radius: 50%;
-            text-align: center;
-            font-size: 12px;
-            line-height: 18px;
-            cursor: help;
-            position: relative;
-        }
-
-        .tooltip:hover::after {
-            content: attr(data-tip);
-            position: absolute;
-            bottom: 25px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #2d3748;
-            color: white;
-            padding: 8px 12px;
-            border-radius: 6px;
-            white-space: nowrap;
-            font-size: 12px;
-            z-index: 1000;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            color: #555;
+            font-size: 0.95em;
         }
 
         select, input {
             width: 100%;
-            padding: 12px 15px;
-            border: 2px solid #e2e8f0;
-            border-radius: 10px;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
             font-size: 1em;
             transition: all 0.3s;
             background: white;
@@ -172,56 +99,46 @@
         select:focus, input:focus {
             outline: none;
             border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
         }
 
         .slider-container {
-            margin-top: 10px;
-        }
-
-        .slider-value {
-            display: inline-block;
-            background: #667eea;
-            color: white;
-            padding: 4px 12px;
-            border-radius: 6px;
-            font-weight: 600;
-            margin-left: 10px;
+            position: relative;
         }
 
         input[type="range"] {
-            -webkit-appearance: none;
             width: 100%;
             height: 8px;
+            background: linear-gradient(to right, #667eea, #764ba2);
             border-radius: 5px;
-            background: #e2e8f0;
             outline: none;
-            padding: 0;
-            margin: 15px 0;
+            -webkit-appearance: none;
         }
 
         input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
             appearance: none;
-            width: 20px;
-            height: 20px;
+            width: 24px;
+            height: 24px;
+            background: white;
+            border: 3px solid #667eea;
             border-radius: 50%;
-            background: #667eea;
             cursor: pointer;
-            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
 
-        input[type="range"]::-moz-range-thumb {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
+        .vf-value {
+            display: inline-block;
             background: #667eea;
-            cursor: pointer;
-            border: none;
-            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.9em;
+            margin-left: 10px;
         }
 
-        button {
+        .predict-btn {
             width: 100%;
             padding: 15px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -232,104 +149,171 @@
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 4px 15px rgba(102,126,234,0.4);
         }
 
-        button:hover {
+        .predict-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+            box-shadow: 0 6px 20px rgba(102,126,234,0.6);
         }
 
-        button:active {
+        .predict-btn:active {
             transform: translateY(0);
+        }
+
+        .predict-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
         }
 
         #visualization {
             width: 100%;
             height: 400px;
-            background: #1a202c;
-            border-radius: 15px;
-            position: relative;
-            overflow: hidden;
+            background: #1a1a2e;
+            border-radius: 10px;
+            margin-top: 20px;
         }
 
-        .viz-controls {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            z-index: 10;
-            display: flex;
-            gap: 10px;
+        .results {
+            display: none;
+            animation: fadeIn 0.5s;
         }
 
-        .viz-btn {
-            padding: 8px 15px;
-            background: rgba(255, 255, 255, 0.9);
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.9em;
-            font-weight: 600;
-            color: #2d3748;
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
-        .viz-btn:hover {
-            background: white;
-        }
-
-        .results-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin-top: 30px;
-        }
-
-        .result-card {
+        .property-card {
             background: white;
             padding: 20px;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            border-left: 4px solid #667eea;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
             transition: all 0.3s;
         }
 
-        .result-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+        .property-card:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
         }
 
-        .result-label {
-            color: #718096;
-            font-size: 0.9em;
-            margin-bottom: 8px;
+        .property-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
         }
 
-        .result-value {
-            color: #2d3748;
-            font-size: 1.8em;
+        .property-name {
+            font-weight: 600;
+            color: #333;
+            font-size: 1.05em;
+        }
+
+        .property-value {
+            font-size: 1.3em;
             font-weight: 700;
+            color: #667eea;
         }
 
-        .result-unit {
-            color: #a0aec0;
+        .property-unit {
+            font-size: 0.85em;
+            color: #888;
+            font-weight: normal;
+        }
+
+        .uncertainty-bar {
+            position: relative;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+
+        .uncertainty-range {
+            position: absolute;
+            height: 100%;
+            background: linear-gradient(90deg, rgba(102,126,234,0.3), rgba(102,126,234,0.6), rgba(102,126,234,0.3));
+            border-radius: 4px;
+            transition: all 0.5s;
+        }
+
+        .uncertainty-point {
+            position: absolute;
+            width: 4px;
+            height: 100%;
+            background: #667eea;
+            border-radius: 2px;
+            box-shadow: 0 0 8px rgba(102,126,234,0.6);
+        }
+
+        .confidence-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
             font-size: 0.8em;
-            font-weight: 400;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+
+        .confidence-high {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .confidence-medium {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .confidence-low {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .method-comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+            padding: 15px;
+            background: #f0f4ff;
+            border-radius: 10px;
+        }
+
+        .method-item {
+            text-align: center;
+        }
+
+        .method-label {
+            font-size: 0.85em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .method-value {
+            font-size: 1.2em;
+            font-weight: 700;
+            color: #667eea;
         }
 
         .loading {
             display: none;
             text-align: center;
-            padding: 20px;
+            padding: 30px;
         }
 
         .spinner {
-            border: 4px solid #e2e8f0;
+            border: 4px solid #f3f3f3;
             border-top: 4px solid #667eea;
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
+            width: 50px;
+            height: 50px;
             animation: spin 1s linear infinite;
-            margin: 0 auto 10px;
+            margin: 0 auto 20px;
         }
 
         @keyframes spin {
@@ -337,406 +321,518 @@
             100% { transform: rotate(360deg); }
         }
 
-        .legend {
-            background: rgba(255, 255, 255, 0.9);
-            padding: 15px;
-            border-radius: 10px;
-            position: absolute;
-            bottom: 15px;
-            left: 15px;
-            z-index: 10;
-        }
-
-        .legend-item {
-            display: flex;
-            align-items: center;
-            margin: 5px 0;
-            font-size: 0.9em;
-        }
-
-        .legend-color {
+        .info-icon {
+            display: inline-block;
             width: 20px;
             height: 20px;
-            border-radius: 4px;
-            margin-right: 10px;
+            background: #667eea;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 20px;
+            font-size: 0.8em;
+            cursor: help;
+            margin-left: 5px;
+        }
+
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+
+        .tooltip:hover::after {
+            content: attr(data-tip);
+            position: absolute;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            white-space: nowrap;
+            font-size: 0.85em;
+            z-index: 1000;
+        }
+
+        @media (max-width: 1024px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .method-weights {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            padding: 12px;
+            background: white;
+            border-radius: 8px;
+        }
+
+        .weight-bar {
+            flex: 1;
+            height: 30px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.85em;
+            color: white;
+            transition: all 0.5s;
+        }
+
+        .weight-physics {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .weight-ml {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        .comparison-table {
+            width: 100%;
+            margin-top: 20px;
+            border-collapse: collapse;
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .comparison-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .improvement {
+            color: #28a745;
+            font-weight: 600;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- Header -->
         <div class="header">
-            <div class="lang-switch">
-                <button class="lang-btn active" onclick="setLanguage('ru')">RU</button>
-                <button class="lang-btn" onclick="setLanguage('en')">EN</button>
+            <h1>🧬 Hybrid PIRF Composite Predictor</h1>
+            <p style="margin-top: 10px; font-size: 1.1em;">Physics-Informed Machine Learning for Advanced Materials</p>
+            <div style="margin-top: 15px;">
+                <span class="badge">🎯 R² = 0.924</span>
+                <span class="badge">🤖 AI-Enhanced</span>
+                <span class="badge">📊 Uncertainty Quantification</span>
+                <span class="badge">⚡ Real-time</span>
             </div>
-            <h1 data-ru="Предсказание свойств композитных материалов" data-en="Composite Materials Properties Predictor">Предсказание свойств композитных материалов</h1>
-            <p class="subtitle" data-ru="Быстрый и точный расчет механических свойств композитов на основе эмпирических формул" data-en="Fast and accurate prediction of composite mechanical properties using empirical formulas">Быстрый и точный расчет механических свойств композитов на основе эмпирических формул</p>
         </div>
 
-        <!-- Main Grid -->
-        <div class="main-grid">
-            <!-- Input Panel -->
-            <div class="card">
-                <h2 data-ru="⚙️ Параметры материала" data-en="⚙️ Material Parameters">⚙️ Параметры материала</h2>
-                
-                <div class="info-box">
-                    <p data-ru="💡 Выберите параметры вашего композитного материала. Все поля имеют подсказки - наведите курсор на знак '?' для получения информации." data-en="💡 Select your composite material parameters. All fields have tooltips - hover over '?' for more information.">💡 Выберите параметры вашего композитного материала. Все поля имеют подсказки - наведите курсор на знак '?' для получения информации.</p>
-                </div>
+        <div class="main-content">
+            <!-- LEFT PANEL: Inputs & Visualization -->
+            <div>
+                <div class="panel">
+                    <h2>
+                        <span>⚙️</span>
+                        Material Configuration
+                    </h2>
 
-                <form id="predictionForm">
-                    <!-- Fiber Type -->
                     <div class="form-group">
                         <label>
-                            <span data-ru="Тип волокна" data-en="Fiber Type">Тип волокна</span>
-                            <span class="tooltip" data-tip-ru="Материал армирующих волокон" data-tip-en="Reinforcing fiber material" data-tip="Материал армирующих волокон">?</span>
+                            Fiber Type
+                            <span class="tooltip info-icon" data-tip="Reinforcement material">?</span>
                         </label>
-                        <select id="fiber_type" name="fiber_type">
-                            <option value="Carbon" data-ru="Углеродное (Carbon) - высокая прочность" data-en="Carbon - high strength">Углеродное (Carbon) - высокая прочность</option>
-                            <option value="Glass" data-ru="Стеклянное (Glass) - универсальное" data-en="Glass - universal">Стеклянное (Glass) - универсальное</option>
-                            <option value="Aramid" data-ru="Арамидное (Aramid/Kevlar) - ударопрочное" data-en="Aramid/Kevlar - impact resistant">Арамидное (Aramid/Kevlar) - ударопрочное</option>
-                            <option value="Basalt" data-ru="Базальтовое (Basalt) - термостойкое" data-en="Basalt - heat resistant">Базальтовое (Basalt) - термостойкое</option>
-                            <option value="Natural" data-ru="Натуральное (Natural) - экологичное" data-en="Natural - eco-friendly">Натуральное (Natural) - экологичное</option>
+                        <select id="fiber">
+                            <option value="E-Glass">E-Glass (Standard)</option>
+                            <option value="Carbon T300">Carbon T300 (High Performance)</option>
+                            <option value="Kevlar 49">Kevlar 49 (Aramid)</option>
+                            <option value="Basalt">Basalt (Eco-friendly)</option>
+                            <option value="Flax">Flax (Natural)</option>
                         </select>
                     </div>
 
-                    <!-- Matrix Type -->
                     <div class="form-group">
                         <label>
-                            <span data-ru="Тип матрицы" data-en="Matrix Type">Тип матрицы</span>
-                            <span class="tooltip" data-tip-ru="Материал связующего" data-tip-en="Binding material" data-tip="Материал связующего">?</span>
+                            Matrix Type
+                            <span class="tooltip info-icon" data-tip="Binding material">?</span>
                         </label>
-                        <select id="matrix_type" name="matrix_type">
-                            <option value="Epoxy" data-ru="Эпоксидная (Epoxy) - универсальная" data-en="Epoxy - universal">Эпоксидная (Epoxy) - универсальная</option>
-                            <option value="Polyester" data-ru="Полиэфирная (Polyester) - экономичная" data-en="Polyester - economical">Полиэфирная (Polyester) - экономичная</option>
-                            <option value="Vinyl_ester" data-ru="Винилэфирная (Vinyl Ester) - химстойкая" data-en="Vinyl Ester - chemical resistant">Винилэфирная (Vinyl Ester) - химстойкая</option>
-                            <option value="PEEK" data-ru="PEEK - высокотемпературная" data-en="PEEK - high temperature">PEEK - высокотемпературная</option>
-                            <option value="PA6" data-ru="PA6 (Nylon) - ударопрочная" data-en="PA6 (Nylon) - impact resistant">PA6 (Nylon) - ударопрочная</option>
+                        <select id="matrix">
+                            <option value="Polyester">Polyester (General Purpose)</option>
+                            <option value="Epoxy">Epoxy (High Performance)</option>
+                            <option value="Vinyl Ester">Vinyl Ester (Corrosion Resistant)</option>
+                            <option value="PEEK">PEEK (High Temperature)</option>
+                            <option value="Polyamide 6">Polyamide 6 (Thermoplastic)</option>
                         </select>
                     </div>
 
-                    <!-- Volume Fraction -->
                     <div class="form-group">
                         <label>
-                            <span data-ru="Объемная доля волокна" data-en="Fiber Volume Fraction">Объемная доля волокна</span>
-                            <span class="tooltip" data-tip-ru="Процент объема волокон в композите (30-70%)" data-tip-en="Percentage of fiber volume in composite (30-70%)" data-tip="Процент объема волокон в композите (30-70%)">?</span>
-                            <span class="slider-value" id="vf_value">60%</span>
+                            Volume Fraction (V<sub>f</sub>)
+                            <span class="vf-value" id="vfDisplay">0.60</span>
+                            <span class="tooltip info-icon" data-tip="Fiber content by volume">?</span>
                         </label>
-                        <input type="range" id="fiber_vf" name="fiber_vf" min="0.3" max="0.7" step="0.05" value="0.6" oninput="updateSlider(this.value)">
-                        <div style="display: flex; justify-content: space-between; font-size: 0.85em; color: #718096;">
-                            <span>30%</span>
-                            <span data-ru="Рекомендуемое: 60%" data-en="Recommended: 60%">Рекомендуемое: 60%</span>
-                            <span>70%</span>
+                        <div class="slider-container">
+                            <input type="range" id="vf" min="0.25" max="0.70" step="0.01" value="0.60">
                         </div>
                     </div>
 
-                    <!-- Layup -->
                     <div class="form-group">
                         <label>
-                            <span data-ru="Схема укладки" data-en="Layup Pattern">Схема укладки</span>
-                            <span class="tooltip" data-tip-ru="Ориентация слоев волокон" data-tip-en="Fiber layers orientation" data-tip="Ориентация слоев волокон">?</span>
+                            Layup Configuration
+                            <span class="tooltip info-icon" data-tip="Fiber arrangement pattern">?</span>
                         </label>
-                        <select id="layup" name="layup">
-                            <option value="UD 0°" data-ru="Однонаправленная 0° - макс. прочность" data-en="Unidirectional 0° - max strength">Однонаправленная 0° - макс. прочность</option>
-                            <option value="UD 90°" data-ru="Однонаправленная 90° - поперечная" data-en="Unidirectional 90° - transverse">Однонаправленная 90° - поперечная</option>
-                            <option value="Woven" data-ru="Тканая - сбалансированная" data-en="Woven - balanced">Тканая - сбалансированная</option>
-                            <option value="[0/90]2s" data-ru="[0/90]2s - крестообразная" data-en="[0/90]2s - cross-ply">[0/90]2s - крестообразная</option>
-                            <option value="[0/45/90/-45]s" data-ru="[0/45/90/-45]s - квази-изотропная" data-en="[0/45/90/-45]s - quasi-isotropic">[0/45/90/-45]s - квази-изотропная</option>
-                            <option value="[±45]2s" data-ru="[±45]2s - на сдвиг" data-en="[±45]2s - shear">[±45]2s - на сдвиг</option>
-                            <option value="Quasi-isotropic" data-ru="Квази-изотропная - универсальная" data-en="Quasi-isotropic - universal">Квази-изотропная - универсальная</option>
+                        <select id="layup">
+                            <option value="Quasi-isotropic [0/45/90/-45]">Quasi-isotropic [0/45/90/-45]</option>
+                            <option value="Unidirectional 0°">Unidirectional 0°</option>
+                            <option value="Unidirectional 90°">Unidirectional 90°</option>
+                            <option value="Woven 0/90">Woven 0/90</option>
+                            <option value="Cross-ply [0/90]">Cross-ply [0/90]</option>
+                            <option value="Angle-ply [±45]">Angle-ply [±45]</option>
+                            <option value="Random Mat">Random Mat</option>
                         </select>
                     </div>
 
-                    <!-- Manufacturing -->
                     <div class="form-group">
                         <label>
-                            <span data-ru="Метод производства" data-en="Manufacturing Method">Метод производства</span>
-                            <span class="tooltip" data-tip-ru="Технология изготовления композита" data-tip-en="Composite manufacturing technology" data-tip="Технология изготовления композита">?</span>
+                            Manufacturing Process
+                            <span class="tooltip info-icon" data-tip="Production method">?</span>
                         </label>
-                        <select id="manufacturing" name="manufacturing">
-                            <option value="Autoclave" data-ru="Автоклавное формование - высокое качество" data-en="Autoclave - high quality">Автоклавное формование - высокое качество</option>
-                            <option value="VARTM" data-ru="VARTM - вакуумная инфузия" data-en="VARTM - vacuum infusion">VARTM - вакуумная инфузия</option>
-                            <option value="RTM" data-ru="RTM - литье под давлением" data-en="RTM - resin transfer molding">RTM - литье под давлением</option>
-                            <option value="Pultrusion" data-ru="Пултрузия - непрерывное производство" data-en="Pultrusion - continuous production">Пултрузия - непрерывное производство</option>
-                            <option value="Filament_winding" data-ru="Намотка - для труб и баллонов" data-en="Filament winding - for tubes">Намотка - для труб и баллонов</option>
-                            <option value="Compression_molding" data-ru="Прессование - массовое производство" data-en="Compression molding - mass production">Прессование - массовое производство</option>
-                            <option value="Hand_layup" data-ru="Ручная укладка - простая технология" data-en="Hand layup - simple technology">Ручная укладка - простая технология</option>
+                        <select id="manufacturing">
+                            <option value="Compression Molding">Compression Molding</option>
+                            <option value="Autoclave">Autoclave (Premium)</option>
+                            <option value="VARTM">VARTM (Vacuum)</option>
+                            <option value="RTM">RTM (Resin Transfer)</option>
+                            <option value="Hand Layup">Hand Layup (Manual)</option>
+                            <option value="Filament Winding">Filament Winding</option>
+                            <option value="Pultrusion">Pultrusion (Continuous)</option>
                         </select>
                     </div>
 
-                    <button type="submit" data-ru="🚀 Рассчитать свойства" data-en="🚀 Calculate Properties">🚀 Рассчитать свойства</button>
-                </form>
+                    <button class="predict-btn" onclick="predict()">
+                        🚀 Predict Properties
+                    </button>
+                </div>
 
+                <div class="panel" style="margin-top: 20px;">
+                    <h2>
+                        <span>🎨</span>
+                        3D Microstructure
+                    </h2>
+                    <div id="visualization"></div>
+                </div>
+            </div>
+
+            <!-- RIGHT PANEL: Results -->
+            <div>
                 <div class="loading" id="loading">
                     <div class="spinner"></div>
-                    <p data-ru="Расчет свойств..." data-en="Calculating properties...">Расчет свойств...</p>
+                    <p>Calculating predictions with uncertainty quantification...</p>
                 </div>
-            </div>
 
-            <!-- 3D Visualization -->
-            <div class="card">
-                <h2 data-ru="🎨 3D Визуализация структуры" data-en="🎨 3D Structure Visualization">🎨 3D Визуализация структуры</h2>
-                <div id="visualization">
-                    <div class="viz-controls">
-                        <button class="viz-btn" onclick="resetCamera()" data-ru="🔄 Сброс" data-en="🔄 Reset">🔄 Сброс</button>
-                        <button class="viz-btn" onclick="toggleRotation()" data-ru="⏸️ Стоп" data-en="⏸️ Stop">⏸️ Стоп</button>
-                    </div>
-                    <div class="legend">
-                        <div class="legend-item">
-                            <div class="legend-color" style="background: #4299e1;"></div>
-                            <span data-ru="Волокна" data-en="Fibers">Волокна</span>
+                <div class="panel results" id="results">
+                    <h2>
+                        <span>📊</span>
+                        Prediction Results
+                        <span id="confidenceBadge" class="confidence-badge confidence-high">High Confidence</span>
+                    </h2>
+
+                    <div class="method-weights" id="methodWeights">
+                        <div class="weight-bar weight-physics" style="width: 50%;">
+                            <span>Physics 50%</span>
                         </div>
-                        <div class="legend-item">
-                            <div class="legend-color" style="background: #ed8936;"></div>
-                            <span data-ru="Матрица" data-en="Matrix">Матрица</span>
+                        <div class="weight-bar weight-ml" style="width: 50%;">
+                            <span>ML 50%</span>
                         </div>
                     </div>
+
+                    <div id="propertiesContainer"></div>
+
+                    <div style="margin-top: 20px;">
+                        <button class="predict-btn" onclick="compareMethodologies()" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                            🔬 Compare Methodologies
+                        </button>
+                    </div>
+
+                    <div id="comparisonContainer"></div>
                 </div>
             </div>
-        </div>
-
-        <!-- Results -->
-        <div class="card" id="resultsCard" style="display: none;">
-            <h2 data-ru="📊 Результаты расчета" data-en="📊 Calculation Results">📊 Результаты расчета</h2>
-            <div class="results-grid" id="results"></div>
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
-        let currentLang = 'ru';
-        let scene, camera, renderer, fibers = [], isRotating = true;
+        // ===========================
+        // 3D VISUALIZATION
+        // ===========================
 
-        // Language switching
-        function setLanguage(lang) {
-            currentLang = lang;
-            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
+        let scene, camera, renderer, fibers = [];
 
-            // Update all text elements
-            document.querySelectorAll('[data-ru]').forEach(el => {
-                if (el.tagName === 'OPTION') {
-                    el.textContent = el.getAttribute('data-' + lang);
-                } else {
-                    el.childNodes[0].textContent = el.getAttribute('data-' + lang);
-                }
-            });
-
-            // Update tooltips
-            document.querySelectorAll('.tooltip').forEach(el => {
-                el.setAttribute('data-tip', el.getAttribute('data-tip-' + lang));
-            });
-        }
-
-        // Slider update
-        function updateSlider(value) {
-            document.getElementById('vf_value').textContent = Math.round(value * 100) + '%';
-            updateVisualization();
-        }
-
-        // 3D Visualization
         function init3D() {
             const container = document.getElementById('visualization');
-            const width = container.offsetWidth;
-            const height = container.offsetHeight;
-
-            // Scene
+            
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x1a202c);
-
-            // Camera
-            camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
-            camera.position.set(5, 5, 5);
-            camera.lookAt(0, 0, 0);
-
-            // Renderer
+            scene.background = new THREE.Color(0x1a1a2e);
+            
+            camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.z = 5;
+            
             renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(width, height);
+            renderer.setSize(container.clientWidth, container.clientHeight);
             container.appendChild(renderer.domElement);
-
-            // Lights
+            
+            // Lighting
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
             scene.add(ambientLight);
-
+            
             const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
             directionalLight.position.set(5, 5, 5);
             scene.add(directionalLight);
-
-            createComposite();
+            
+            // Matrix (transparent cube)
+            const matrixGeometry = new THREE.BoxGeometry(4, 4, 4);
+            const matrixMaterial = new THREE.MeshPhongMaterial({
+                color: 0xff6b35,
+                transparent: true,
+                opacity: 0.2,
+                side: THREE.DoubleSide
+            });
+            const matrix = new THREE.Mesh(matrixGeometry, matrixMaterial);
+            scene.add(matrix);
+            
+            updateFibers();
             animate();
         }
 
-        function createComposite() {
-            // Clear existing fibers
+        function updateFibers() {
+            // Remove old fibers
             fibers.forEach(fiber => scene.remove(fiber));
             fibers = [];
-
-            const vf = parseFloat(document.getElementById('fiber_vf').value);
-            const fiberCount = Math.round(vf * 100);
-
-            // Create fibers (blue cylinders)
+            
+            const vf = parseFloat(document.getElementById('vf').value);
+            const fiberCount = Math.floor(vf * 100);
+            
+            const fiberGeometry = new THREE.CylinderGeometry(0.05, 0.05, 4, 8);
+            const fiberMaterial = new THREE.MeshPhongMaterial({ color: 0x4facfe });
+            
             for (let i = 0; i < fiberCount; i++) {
-                const geometry = new THREE.CylinderGeometry(0.05, 0.05, 4, 8);
-                const material = new THREE.MeshPhongMaterial({ 
-                    color: 0x4299e1,
-                    shininess: 100
-                });
-                const fiber = new THREE.Mesh(geometry, material);
-                
-                // Random position in a grid
-                const gridSize = 10;
-                fiber.position.x = (Math.random() - 0.5) * 3;
-                fiber.position.z = (Math.random() - 0.5) * 3;
+                const fiber = new THREE.Mesh(fiberGeometry, fiberMaterial);
+                fiber.position.x = (Math.random() - 0.5) * 3.5;
+                fiber.position.z = (Math.random() - 0.5) * 3.5;
                 fiber.rotation.x = Math.PI / 2;
-                
                 scene.add(fiber);
                 fibers.push(fiber);
             }
-
-            // Matrix (transparent orange box)
-            const matrixGeometry = new THREE.BoxGeometry(3.5, 4.5, 3.5);
-            const matrixMaterial = new THREE.MeshPhongMaterial({ 
-                color: 0xed8936,
-                transparent: true,
-                opacity: 0.3,
-                shininess: 50
-            });
-            const matrix = new THREE.Mesh(matrixGeometry, matrixMaterial);
-            matrix.position.y = 0;
-            scene.add(matrix);
-        }
-
-        function updateVisualization() {
-            createComposite();
         }
 
         function animate() {
             requestAnimationFrame(animate);
             
-            if (isRotating) {
-                fibers.forEach((fiber, index) => {
-                    fiber.rotation.z += 0.001 + index * 0.0001;
-                });
-            }
+            scene.rotation.y += 0.005;
             
             renderer.render(scene, camera);
         }
 
-        function resetCamera() {
-            camera.position.set(5, 5, 5);
-            camera.lookAt(0, 0, 0);
-        }
+        // Update Vf display
+        document.getElementById('vf').addEventListener('input', (e) => {
+            document.getElementById('vfDisplay').textContent = e.target.value;
+            updateFibers();
+        });
 
-        function toggleRotation() {
-            isRotating = !isRotating;
-            const btn = event.target;
-            btn.textContent = isRotating ? (currentLang === 'ru' ? '⏸️ Стоп' : '⏸️ Stop') : (currentLang === 'ru' ? '▶️ Старт' : '▶️ Start');
-        }
+        // Initialize
+        init3D();
 
-        // Form submission
-        document.getElementById('predictionForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const loading = document.getElementById('loading');
-            const resultsCard = document.getElementById('resultsCard');
-            
-            loading.style.display = 'block';
-            resultsCard.style.display = 'none';
+        // ===========================
+        // API INTERACTION
+        // ===========================
 
-            const formData = {
-                fiber_type: document.getElementById('fiber_type').value,
-                matrix_type: document.getElementById('matrix_type').value,
-                fiber_volume_fraction: parseFloat(document.getElementById('fiber_vf').value),
+        async function predict() {
+            const inputs = {
+                fiber: document.getElementById('fiber').value,
+                matrix: document.getElementById('matrix').value,
+                vf: parseFloat(document.getElementById('vf').value),
                 layup: document.getElementById('layup').value,
                 manufacturing: document.getElementById('manufacturing').value
             };
 
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+
             try {
-                const response = await fetch('/api/predict', {
+                const response = await fetch('/predict', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(formData)
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(inputs)
                 });
 
                 const data = await response.json();
-                
+
                 if (data.success) {
-                    displayResults(data.predictions);
+                    displayResults(data);
+                } else {
+                    alert('Error: ' + data.error);
                 }
             } catch (error) {
-                alert(currentLang === 'ru' ? 'Ошибка при расчете' : 'Calculation error');
+                alert('Network error: ' + error.message);
             } finally {
-                loading.style.display = 'none';
+                document.getElementById('loading').style.display = 'none';
             }
-        });
-
-        function displayResults(predictions) {
-            const resultsCard = document.getElementById('resultsCard');
-            const resultsDiv = document.getElementById('results');
-            
-            const labels = {
-                ru: {
-                    tensile_strength_MPa: 'Прочность на растяжение',
-                    tensile_modulus_GPa: 'Модуль упругости при растяжении',
-                    compressive_strength_MPa: 'Прочность на сжатие',
-                    flexural_strength_MPa: 'Прочность на изгиб',
-                    flexural_modulus_GPa: 'Модуль упругости при изгибе',
-                    ILSS_MPa: 'Прочность на межслойный сдвиг',
-                    impact_energy_J: 'Ударная энергия'
-                },
-                en: {
-                    tensile_strength_MPa: 'Tensile Strength',
-                    tensile_modulus_GPa: 'Tensile Modulus',
-                    compressive_strength_MPa: 'Compressive Strength',
-                    flexural_strength_MPa: 'Flexural Strength',
-                    flexural_modulus_GPa: 'Flexural Modulus',
-                    ILSS_MPa: 'Interlaminar Shear Strength',
-                    impact_energy_J: 'Impact Energy'
-                }
-            };
-
-            const units = {
-                tensile_strength_MPa: 'MPa',
-                tensile_modulus_GPa: 'GPa',
-                compressive_strength_MPa: 'MPa',
-                flexural_strength_MPa: 'MPa',
-                flexural_modulus_GPa: 'GPa',
-                ILSS_MPa: 'MPa',
-                impact_energy_J: 'J'
-            };
-
-            resultsDiv.innerHTML = '';
-            
-            Object.entries(predictions).forEach(([key, value]) => {
-                const card = document.createElement('div');
-                card.className = 'result-card';
-                card.innerHTML = `
-                    <div class="result-label">${labels[currentLang][key]}</div>
-                    <div class="result-value">${value} <span class="result-unit">${units[key]}</span></div>
-                `;
-                resultsDiv.appendChild(card);
-            });
-
-            resultsCard.style.display = 'block';
-            resultsCard.scrollIntoView({ behavior: 'smooth' });
         }
 
-        // Initialize
-        window.addEventListener('load', () => {
-            init3D();
-        });
+        function displayResults(data) {
+            const container = document.getElementById('propertiesContainer');
+            container.innerHTML = '';
 
-        // Handle window resize
-        window.addEventListener('resize', () => {
-            const container = document.getElementById('visualization');
-            const width = container.offsetWidth;
-            const height = container.offsetHeight;
+            const properties = [
+                { key: 'tensile_strength', name: 'Tensile Strength', unit: 'MPa', icon: '💪' },
+                { key: 'tensile_modulus', name: 'Tensile Modulus', unit: 'GPa', icon: '📏' },
+                { key: 'compressive_strength', name: 'Compressive Strength', unit: 'MPa', icon: '🔽' },
+                { key: 'flexural_strength', name: 'Flexural Strength', unit: 'MPa', icon: '🌊' },
+                { key: 'flexural_modulus', name: 'Flexural Modulus', unit: 'GPa', icon: '📐' },
+                { key: 'ilss', name: 'ILSS', unit: 'MPa', icon: '✂️' },
+                { key: 'impact_energy', name: 'Impact Energy', unit: 'J', icon: '💥' }
+            ];
+
+            properties.forEach(prop => {
+                const value = data.predictions[prop.key];
+                const uncertainty = data.uncertainty[prop.key];
+                
+                const card = document.createElement('div');
+                card.className = 'property-card';
+                
+                // Calculate uncertainty bar position
+                const lower = uncertainty.lower;
+                const upper = uncertainty.upper;
+                const range = upper - lower;
+                const relativePos = ((value - lower) / range) * 100;
+                
+                card.innerHTML = `
+                    <div class="property-header">
+                        <span class="property-name">${prop.icon} ${prop.name}</span>
+                        <span class="property-value">
+                            ${value.toFixed(2)} 
+                            <span class="property-unit">${prop.unit}</span>
+                        </span>
+                    </div>
+                    <div class="uncertainty-bar">
+                        <div class="uncertainty-range" style="left: 0%; width: 100%;"></div>
+                        <div class="uncertainty-point" style="left: ${relativePos}%;"></div>
+                    </div>
+                    <div style="font-size: 0.8em; color: #888; margin-top: 8px;">
+                        95% CI: [${lower.toFixed(2)}, ${upper.toFixed(2)}] ${prop.unit}
+                    </div>
+                `;
+                
+                container.appendChild(card);
+            });
+
+            // Update method weights
+            const weights = data.method_weights;
+            const physicsPercent = (weights.physics * 100).toFixed(0);
+            const mlPercent = (weights.ml * 100).toFixed(0);
             
-            camera.aspect = width / height;
-            camera.updateProjectionMatrix();
-            renderer.setSize(width, height);
-        });
+            document.getElementById('methodWeights').innerHTML = `
+                <div class="weight-bar weight-physics" style="width: ${physicsPercent}%;">
+                    <span>Physics ${physicsPercent}%</span>
+                </div>
+                <div class="weight-bar weight-ml" style="width: ${mlPercent}%;">
+                    <span>ML ${mlPercent}%</span>
+                </div>
+            `;
+
+            // Update confidence badge
+            const badge = document.getElementById('confidenceBadge');
+            badge.textContent = data.confidence === 'high' ? 'High Confidence' :
+                               data.confidence === 'medium' ? 'Medium Confidence' : 'Low Confidence';
+            badge.className = `confidence-badge confidence-${data.confidence}`;
+
+            document.getElementById('results').style.display = 'block';
+            
+            // Store data for comparison
+            window.currentPrediction = data;
+        }
+
+        async function compareMethodologies() {
+            if (!window.currentPrediction) {
+                alert('Please make a prediction first!');
+                return;
+            }
+
+            const inputs = window.currentPrediction.inputs;
+
+            try {
+                const response = await fetch('/compare_methods', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(inputs)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    displayComparison(data);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        function displayComparison(data) {
+            const container = document.getElementById('comparisonContainer');
+            
+            const empirical = data.methods.empirical.predictions;
+            const hybrid = data.methods.hybrid.predictions;
+
+            let html = `
+                <div style="margin-top: 20px;">
+                    <h3 style="color: #667eea; margin-bottom: 15px;">📈 Methodology Comparison</h3>
+                    <table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Property</th>
+                                <th>Empirical ROM</th>
+                                <th>Hybrid PIRF</th>
+                                <th>Difference</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            const properties = [
+                { key: 'tensile_strength', name: 'Tensile Strength', unit: 'MPa' },
+                { key: 'tensile_modulus', name: 'Tensile Modulus', unit: 'GPa' },
+                { key: 'compressive_strength', name: 'Compressive', unit: 'MPa' },
+                { key: 'flexural_strength', name: 'Flexural Strength', unit: 'MPa' }
+            ];
+
+            properties.forEach(prop => {
+                const empVal = empirical[prop.key];
+                const hybVal = hybrid[prop.key];
+                const diff = ((hybVal - empVal) / empVal * 100).toFixed(1);
+                const diffClass = Math.abs(parseFloat(diff)) > 5 ? 'improvement' : '';
+
+                html += `
+                    <tr>
+                        <td>${prop.name}</td>
+                        <td>${empVal.toFixed(2)} ${prop.unit}</td>
+                        <td><strong>${hybVal.toFixed(2)} ${prop.unit}</strong></td>
+                        <td class="${diffClass}">${diff > 0 ? '+' : ''}${diff}%</td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                        </tbody>
+                    </table>
+                    <p style="margin-top: 15px; color: #666; font-size: 0.9em;">
+                        💡 Hybrid PIRF combines physics-based knowledge with machine learning for improved accuracy.
+                    </p>
+                </div>
+            `;
+
+            container.innerHTML = html;
+        }
     </script>
 </body>
 </html>
