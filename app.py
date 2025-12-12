@@ -1,3 +1,8 @@
+"""
+Hybrid Physics-Informed Machine Learning API for Composite Materials
+Version: 2.0 (Enhanced with ML)
+"""
+
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import numpy as np
@@ -80,14 +85,8 @@ class PhysicsEngine:
     @staticmethod
     def calculate_rom_properties(fiber: FiberProperties, matrix: MatrixProperties, 
                                  Vf: float, layup: str, manufacturing: str) -> Dict[str, float]:
-        """
-        Расчёт свойств по правилу смесей
+        """Расчёт свойств по правилу смесей"""
         
-        Returns:
-            dict: 7 механических свойств + промежуточные значения
-        """
-        
-        # Коэффициенты
         eta_L = EFFICIENCY_FACTORS['eta_L']
         eta_T = EFFICIENCY_FACTORS['eta_T']
         eta_strength = EFFICIENCY_FACTORS['eta_strength']
@@ -95,43 +94,31 @@ class PhysicsEngine:
         eta_interface = EFFICIENCY_FACTORS['eta_interface']
         eta_mfg = MANUFACTURING_FACTORS[manufacturing]
         
-        # === UNIDIRECTIONAL PROPERTIES ===
-        
-        # 1. Longitudinal Modulus (GPa)
+        # Unidirectional properties
         E_L = eta_L * fiber.E * Vf + matrix.E * (1 - Vf)
-        
-        # 2. Transverse Modulus (GPa)
         E_T = 1 / (Vf / (eta_T * fiber.E) + (1 - Vf) / matrix.E)
         
-        # 3. Tensile Strength (MPa)
-        sigma_m_prime = 0.45 * matrix.sigma  # Matrix stress at fiber failure
+        sigma_m_prime = 0.45 * matrix.sigma
         sigma_UTS = eta_strength * fiber.sigma * Vf + sigma_m_prime * (1 - Vf)
         
-        # 4. Compressive Strength (MPa)
         sigma_comp_buckling = matrix.G / (1 - Vf)
-        sigma_comp_crushing = fiber.sigma * Vf * 0.8  # Fibers weaker in compression
+        sigma_comp_crushing = fiber.sigma * Vf * 0.8
         sigma_comp = eta_comp * min(sigma_comp_buckling, sigma_comp_crushing)
         
-        # 5. Flexural Strength (MPa)
         modulus_ratio = fiber.E / matrix.E
         sigma_flex = 1.25 * sigma_UTS * (1 + 0.1 * modulus_ratio) ** (-0.3)
-        
-        # 6. Flexural Modulus (GPa)
         E_flex = 1.05 * E_L * (1 + 0.05 * Vf)
         
-        # 7. Interlaminar Shear Strength (MPa)
-        tau_m = 0.50 * matrix.sigma  # Matrix shear strength
+        tau_m = 0.50 * matrix.sigma
         tau_ILSS = tau_m * (1 - 0.5 * Vf) * eta_interface
         
-        # 8. Impact Energy (J)
         eta_f = 0.75
         eta_m = 0.70
         U_interface_fraction = 0.20
         U_impact = (fiber.U_f * Vf * eta_f + 
                    matrix.U_m * (1 - Vf) * eta_m) * (1 + U_interface_fraction)
         
-        # === LAYUP CORRECTIONS ===
-        
+        # Layup corrections
         layup_factors = {
             'Unidirectional 0°': {'k_E': 1.00, 'k_sigma': 1.00},
             'Unidirectional 90°': {'k_E': E_T/E_L, 'k_sigma': 0.15},
@@ -148,16 +135,13 @@ class PhysicsEngine:
         k_E = layup_factors[layup]['k_E']
         k_sigma = layup_factors[layup]['k_sigma']
         
-        # Apply layup corrections
         E_L_layup = E_L * k_E
         sigma_UTS_layup = sigma_UTS * k_sigma
         sigma_comp_layup = sigma_comp * k_sigma * 0.9
         sigma_flex_layup = sigma_flex * k_sigma * 1.15
         E_flex_layup = E_flex * k_E * 0.95
         
-        # === MANUFACTURING CORRECTIONS ===
-        
-        # Additional empirical corrections from database fitting
+        # Manufacturing corrections
         correction_factors = {
             'tensile_strength': 0.262,
             'tensile_modulus': 0.72,
@@ -168,9 +152,7 @@ class PhysicsEngine:
             'impact': 0.98
         }
         
-        # Final properties
         properties = {
-            # Main predictions
             'tensile_strength': sigma_UTS_layup * eta_mfg * correction_factors['tensile_strength'],
             'tensile_modulus': E_L_layup * eta_mfg * correction_factors['tensile_modulus'],
             'compressive_strength': sigma_comp_layup * eta_mfg * correction_factors['compressive_strength'],
@@ -178,8 +160,6 @@ class PhysicsEngine:
             'flexural_modulus': E_flex_layup * eta_mfg * correction_factors['flexural_modulus'],
             'ilss': tau_ILSS * eta_mfg * correction_factors['ilss'],
             'impact_energy': U_impact * eta_mfg * correction_factors['impact'],
-            
-            # Intermediate values for feature engineering
             'E_L_UD': E_L,
             'E_T_UD': E_T,
             'sigma_UTS_UD': sigma_UTS,
@@ -202,18 +182,11 @@ class FeatureEngineer:
     def create_features(fiber_name: str, matrix_name: str, Vf: float, 
                        layup: str, manufacturing: str, 
                        rom_properties: Dict[str, float]) -> np.ndarray:
-        """
-        Создаёт 26 features для ML модели:
-        - 5 base features
-        - 7 ROM predictions
-        - 4 constituent ratios
-        - 3 Vf transformations
-        - 7 interaction terms
-        """
+        """Создаёт 26 features для ML модели"""
         
         features = []
         
-        # === BASE FEATURES (5) ===
+        # Base features (5)
         fiber_encoding = {'Carbon T300': 0, 'E-Glass': 1, 'Kevlar 49': 2, 
                          'Basalt': 3, 'Flax': 4}
         matrix_encoding = {'Epoxy': 0, 'Polyester': 1, 'Vinyl Ester': 2, 
@@ -235,7 +208,7 @@ class FeatureEngineer:
             mfg_encoding[manufacturing]
         ])
         
-        # === PHYSICS-DERIVED FEATURES (7) - ROM predictions ===
+        # Physics-derived features (7)
         features.extend([
             rom_properties['tensile_strength'],
             rom_properties['tensile_modulus'],
@@ -246,7 +219,7 @@ class FeatureEngineer:
             rom_properties['impact_energy']
         ])
         
-        # === CONSTITUENT PROPERTY RATIOS (4) ===
+        # Constituent property ratios (4)
         features.extend([
             rom_properties['E_f_E_m_ratio'],
             rom_properties['sigma_f_sigma_m_ratio'],
@@ -254,14 +227,14 @@ class FeatureEngineer:
             rom_properties['G_f_G_m_ratio']
         ])
         
-        # === VOLUME FRACTION TRANSFORMATIONS (3) ===
+        # Volume fraction transformations (3)
         features.extend([
             Vf ** 2,
             Vf ** 3,
-            1 / (1 - Vf + 1e-6)  # Avoid division by zero
+            1 / (1 - Vf + 1e-6)
         ])
         
-        # === INTERACTION TERMS (7) ===
+        # Interaction terms (7)
         features.extend([
             Vf * rom_properties['E_f_E_m_ratio'],
             Vf * rom_properties['sigma_f_sigma_m_ratio'],
@@ -282,7 +255,7 @@ class HybridPIRF:
     """Physics-Informed Random Forest - Гибридная модель"""
     
     def __init__(self):
-        self.models = {}  # Словарь моделей для каждого свойства
+        self.models = {}
         self.scaler = None
         self.feature_names = None
         
@@ -306,19 +279,9 @@ class HybridPIRF:
             print("⚠ No scaler found.")
     
     def predict(self, features: np.ndarray, rom_predictions: Dict[str, float]) -> Dict[str, any]:
-        """
-        Гибридное предсказание с uncertainty quantification
-        
-        Returns:
-            dict: {
-                'predictions': {...},  # Point predictions
-                'uncertainty': {...},  # Prediction intervals
-                'method_weights': {...}  # Contribution of each method
-            }
-        """
+        """Гибридное предсказание с uncertainty quantification"""
         
         if not self.models:
-            # Fallback to pure ROM if no models loaded
             return {
                 'predictions': rom_predictions,
                 'uncertainty': {k: {'lower': v*0.85, 'upper': v*1.15} 
@@ -327,7 +290,6 @@ class HybridPIRF:
                 'confidence': 'low'
             }
         
-        # Scale features
         if self.scaler:
             features_scaled = self.scaler.transform(features)
         else:
@@ -343,20 +305,15 @@ class HybridPIRF:
             if prop in self.models:
                 model = self.models[prop]
                 
-                # Ensemble prediction (multiple models)
                 ml_pred = model['rf'].predict(features_scaled)[0]
                 
-                # Uncertainty from RF trees
                 tree_predictions = np.array([tree.predict(features_scaled)[0] 
                                             for tree in model['rf'].estimators_])
                 ml_std = np.std(tree_predictions)
                 
-                # Physics prediction
                 physics_pred = rom_predictions[prop]
-                physics_std = physics_pred * 0.10  # Assume 10% uncertainty for physics
+                physics_std = physics_pred * 0.10
                 
-                # Adaptive confidence weighting
-                # Higher ML uncertainty → trust physics more
                 alpha = 2.5
                 w_ml = np.exp(-alpha * ml_std**2)
                 w_physics = np.exp(-alpha * physics_std**2)
@@ -365,22 +322,19 @@ class HybridPIRF:
                 w_ml_norm = w_ml / w_total
                 w_physics_norm = w_physics / w_total
                 
-                # Hybrid prediction
                 hybrid_pred = w_ml_norm * ml_pred + w_physics_norm * physics_pred
                 
-                # Combined uncertainty
                 hybrid_std = np.sqrt(w_ml_norm**2 * ml_std**2 + 
                                     w_physics_norm**2 * physics_std**2)
                 
                 predictions[prop] = float(hybrid_pred)
                 uncertainties[prop] = {
-                    'lower': float(hybrid_pred - 1.96 * hybrid_std),  # 95% CI
+                    'lower': float(hybrid_pred - 1.96 * hybrid_std),
                     'upper': float(hybrid_pred + 1.96 * hybrid_std),
                     'std': float(hybrid_std)
                 }
                 
             else:
-                # Fallback to ROM
                 predictions[prop] = rom_predictions[prop]
                 uncertainties[prop] = {
                     'lower': rom_predictions[prop] * 0.85,
@@ -406,7 +360,6 @@ physics_engine = PhysicsEngine()
 feature_engineer = FeatureEngineer()
 hybrid_model = HybridPIRF()
 
-# Load models on startup
 hybrid_model.load_models()
 
 # ===========================
@@ -420,32 +373,10 @@ def index():
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    """
-    Main prediction endpoint
-    
-    Request JSON:
-    {
-        "fiber": "E-Glass",
-        "matrix": "Polyester",
-        "vf": 0.60,
-        "layup": "Quasi-isotropic [0/45/90/-45]",
-        "manufacturing": "Compression Molding"
-    }
-    
-    Response JSON:
-    {
-        "success": true,
-        "predictions": {...},
-        "uncertainty": {...},
-        "rom_predictions": {...},
-        "method": "hybrid",
-        "confidence": "high"
-    }
-    """
+    """Main prediction endpoint"""
     try:
         data = request.json
         
-        # Validate inputs
         fiber_name = data['fiber']
         matrix_name = data['matrix']
         Vf = float(data['vf'])
@@ -462,20 +393,16 @@ def predict():
         fiber = FIBERS[fiber_name]
         matrix = MATRICES[matrix_name]
         
-        # Step 1: Calculate ROM properties
         rom_props = physics_engine.calculate_rom_properties(
             fiber, matrix, Vf, layup, manufacturing
         )
         
-        # Step 2: Create features
         features = feature_engineer.create_features(
             fiber_name, matrix_name, Vf, layup, manufacturing, rom_props
         )
         
-        # Step 3: Hybrid prediction
         result = hybrid_model.predict(features, rom_props)
         
-        # Format response
         response = {
             'success': True,
             'predictions': result['predictions'],
@@ -511,9 +438,7 @@ def predict():
 
 @app.route('/compare_methods', methods=['POST'])
 def compare_methods():
-    """
-    Compare predictions from different methods
-    """
+    """Compare predictions from different methods"""
     try:
         data = request.json
         
@@ -526,17 +451,14 @@ def compare_methods():
         fiber = FIBERS[fiber_name]
         matrix = MATRICES[matrix_name]
         
-        # ROM predictions
         rom_props = physics_engine.calculate_rom_properties(
             fiber, matrix, Vf, layup, manufacturing
         )
         
-        # Features for ML
         features = feature_engineer.create_features(
             fiber_name, matrix_name, Vf, layup, manufacturing, rom_props
         )
         
-        # Hybrid prediction
         hybrid_result = hybrid_model.predict(features, rom_props)
         
         response = {
@@ -551,9 +473,6 @@ def compare_methods():
                     'uncertainty': hybrid_result['uncertainty'],
                     'description': 'Physics-Informed Random Forest (PIRF)'
                 }
-            },
-            'improvement': {
-                # Calculate improvement metrics (if validation data available)
             }
         }
         
@@ -568,7 +487,9 @@ def get_materials():
     return jsonify({
         'fibers': list(FIBERS.keys()),
         'matrices': list(MATRICES.keys()),
-        'layups': list(MANUFACTURING_FACTORS.keys()),
+        'layups': ['Unidirectional 0°', 'Unidirectional 90°', 'Woven 0/90',
+                   'Quasi-isotropic [0/45/90/-45]', 'Angle-ply [±45]',
+                   'Cross-ply [0/90]', 'Random Mat'],
         'manufacturing': list(MANUFACTURING_FACTORS.keys())
     })
 

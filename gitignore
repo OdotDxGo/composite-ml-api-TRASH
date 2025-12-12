@@ -4,6 +4,9 @@ __pycache__/
 *$py.class
 *.so
 .Python
+env/
+venv/
+ENV/
 build/
 develop-eggs/
 dist/
@@ -20,11 +23,11 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual environments
-venv/
-ENV/
-env/
-.venv
+# Models (optional - include if want to commit trained models)
+# models/*.pkl
+
+# Data
+# data/*.csv
 
 # IDE
 .vscode/
@@ -37,9 +40,15 @@ env/
 .DS_Store
 Thumbs.db
 
-# Environment variables
-.env
-.env.local
-
 # Logs
 *.log
+
+# Environment
+.env
+
+# Test outputs
+*.png
+*.xlsx
+validation_results.csv
+batch_predictions.csv
+load_test_results.csv

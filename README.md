@@ -1,61 +1,69 @@
 # 🧬 Hybrid PIRF - Composite Materials Property Prediction
 
-**Physics-Informed Random Forest** for predicting mechanical properties of fiber-reinforced polymer composites.
+**Physics-Informed Random Forest** для предсказания механических свойств композитных материалов.
 
 [![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new)
 
-## 🎯 Features
+![Version](https://img.shields.io/badge/version-2.0-blue)
+![Python](https://img.shields.io/badge/python-3.10+-green)
+![License](https://img.shields.io/badge/license-MIT-orange)
 
-- **Hybrid ML Framework**: Combines Rule of Mixtures (ROM) with Random Forest
-- **R² = 0.924**: Superior accuracy over pure empirical (0.821) and pure ML (0.887)
-- **Uncertainty Quantification**: Bayesian confidence intervals
-- **Real-time Predictions**: 38ms average latency
-- **Interactive 3D Visualization**: Microstructure explorer
-- **7 Mechanical Properties**: Tensile, compressive, flexural, shear, impact
+---
 
-## 🚀 Quick Start
+## 🎯 Возможности
 
-### 1. Clone Repository
+- **Гибридная ML архитектура**: Комбинация Rule of Mixtures + Random Forest
+- **R² = 0.924**: Превосходная точность над чистой эмпирикой (0.821) и чистым ML (0.887)
+- **Uncertainty Quantification**: Байесовские доверительные интервалы
+- **Real-time**: 38ms средняя задержка
+- **Интерактивная 3D визуализация**: Исследование микроструктуры
+- **7 механических свойств**: Растяжение, сжатие, изгиб, сдвиг, удар
+
+---
+
+## 🚀 Быстрый старт
+
+### Локальный запуск
 ```bash
+# 1. Клонировать репозиторий
 git clone https://github.com/yourusername/composite-ml-api.git
 cd composite-ml-api
-```
 
-### 2. Install Dependencies
-```bash
+# 2. Установить зависимости
 pip install -r requirements.txt
-```
 
-### 3. Train Models
-```bash
+# 3. Обучить модели
 python train_models.py
-```
 
-This will:
-- Generate/load database (363 samples)
-- Train Random Forest models for 7 properties
-- Save models to `models/` directory
-- Display training metrics
-
-Expected output:
-```
-R² (test): 0.924
-Average MAE: 25.6 MPa
-Training time: ~3 minutes
-```
-
-### 4. Run API
-```bash
+# 4. Запустить API
 python app.py
+
+# 5. Открыть браузер
+http://localhost:5000
 ```
 
-Visit: `http://localhost:5000`
+### Deploy на Railway
+```bash
+# 1. Push в GitHub
+git add .
+git commit -m "Initial commit"
+git push origin main
+
+# 2. Railway Dashboard
+# - New Project → Deploy from GitHub
+# - Select: composite-ml-api
+# - Build Command: pip install -r requirements.txt && python train_models.py
+# - Wait ~5 minutes
+# - Done! ✅
+```
+
+---
 
 ## 📊 API Endpoints
 
-### POST /predict
+### `POST /predict`
 
-Predict composite properties with uncertainty.
+Предсказание свойств с uncertainty.
 
 **Request:**
 ```json
@@ -76,15 +84,17 @@ Predict composite properties with uncertainty.
     "tensile_strength": 231.2,
     "tensile_modulus": 14.7,
     "compressive_strength": 158.4,
-    ...
+    "flexural_strength": 302.1,
+    "flexural_modulus": 13.5,
+    "ilss": 22.3,
+    "impact_energy": 15.4
   },
   "uncertainty": {
     "tensile_strength": {
       "lower": 218.0,
       "upper": 245.0,
       "std": 6.9
-    },
-    ...
+    }
   },
   "method_weights": {
     "physics": 0.45,
@@ -94,148 +104,161 @@ Predict composite properties with uncertainty.
 }
 ```
 
-### POST /compare_methods
+### `POST /compare_methods`
 
-Compare empirical vs hybrid predictions.
+Сравнение эмпирического и гибридного методов.
 
-### GET /materials
+### `GET /materials`
 
-List available materials and configurations.
+Список доступных материалов и конфигураций.
 
-### GET /health
+### `GET /health`
 
-API health check.
+Проверка здоровья API.
 
-## 🧪 Testing with Real Data
+---
 
-Test against your experimental results:
-```python
-import requests
+## 🧪 Тестирование
+```bash
+# Полное тестирование API
+python test_api.py
 
-# Your experimental data
-data = {
-    "fiber": "E-Glass",
-    "matrix": "Polyester",
-    "vf": 0.60,
-    "layup": "Quasi-isotropic [0/45/90/-45]",
-    "manufacturing": "Compression Molding"
-}
+# Валидация с реальными данными
+python validate_with_experimental.py
 
-# Get prediction
-response = requests.post('http://localhost:5000/predict', json=data)
-result = response.json()
+# Массовые предсказания
+python batch_predict.py
 
-# Compare
-print(f"Predicted: {result['predictions']['tensile_strength']:.1f} MPa")
-print(f"Experimental: 227.8 MPa")
-print(f"Error: {abs(result['predictions']['tensile_strength'] - 227.8):.1f} MPa")
+# Оптимизация конфигурации
+python optimize.py
+
+# Анализ чувствительности
+python sensitivity_analysis.py
+
+# Оценка стоимости
+python cost_estimation.py
+
+# Мониторинг API
+python monitoring.py
 ```
 
-## 📁 Project Structure
+---
+
+## 📁 Структура проекта
 ```
 composite-ml-api/
-├── app.py                      # Flask API + PIRF model
-├── train_models.py             # Training pipeline
-├── models/
-│   ├── hybrid_model.pkl        # Trained models
-│   ├── scaler.pkl              # Feature scaler
-│   └── training_results.csv    # Metrics
-├── data/
-│   └── composite_database.csv  # Training data
+├── app.py                          # Flask API + PIRF
+├── train_models.py                 # Обучение моделей
+├── requirements.txt                # Зависимости
+├── Procfile                        # Railway
+├── README.md                       # Документация
+├── .gitignore                      # Исключения
 ├── static/
-│   └── index.html              # Web interface
-├── requirements.txt
-├── Procfile
-└── README.md
+│   └── index.html                  # Веб-интерфейс
+├── data/
+│   └── composite_database.csv      # База данных
+├── models/                         # Обученные модели
+│   ├── hybrid_model.pkl
+│   └── scaler.pkl
+├── test_api.py                     # Тесты
+├── validate_with_experimental.py   # Валидация
+├── batch_predict.py                # Пакетные предсказания
+├── optimize.py                     # Оптимизация
+├── sensitivity_analysis.py         # Анализ
+├── cost_estimation.py              # Стоимость
+├── monitoring.py                   # Мониторинг
+└── DEPLOYMENT_GUIDE.md             # Инструкция деплоя
 ```
 
-## 🔬 Methodology
+---
+
+## 🔬 Методология
 
 ### Physics-Based Features (Rule of Mixtures)
-```python
+```
 E_L = η_L × E_f × V_f + E_m × (1 - V_f)
 σ_UTS = η_L × σ_f × V_f + σ'_m × (1 - V_f)
-...
 ```
 
 ### Feature Engineering
 
-26 features total:
-- 5 base features (fiber, matrix, Vf, layup, manufacturing)
-- 7 ROM predictions
-- 4 constituent ratios (E_f/E_m, σ_f/σ_m, ...)
-- 3 Vf transformations (Vf², Vf³, 1/(1-Vf))
-- 7 interaction terms
+26 features:
+- 5 базовых (fiber, matrix, Vf, layup, manufacturing)
+- 7 ROM предсказаний
+- 4 отношения свойств (E_f/E_m, σ_f/σ_m, ...)
+- 3 трансформации Vf (Vf², Vf³, 1/(1-Vf))
+- 7 взаимодействий
 
 ### Hybrid Prediction
-```python
+```
 prediction = w_physics × ROM + w_ml × RandomForest
 ```
 
-Weights adapt based on local data density and model uncertainty.
+Веса адаптируются на основе локальной плотности данных и неопределенности модели.
 
-## 📈 Performance Metrics
+---
 
-| Method | R² | MAE | RMSE | Prediction Time |
-|--------|-----|-----|------|-----------------|
+## 📈 Производительность
+
+| Метод | R² | MAE | RMSE | Время |
+|-------|-----|-----|------|-------|
 | Empirical ROM | 0.821 | 42.3 MPa | 58.7 MPa | 0.8 ms |
 | Pure ML (RF) | 0.887 | 31.2 MPa | 45.8 MPa | 12.3 ms |
 | **Hybrid PIRF** | **0.924** | **25.6 MPa** | **37.4 MPa** | **38.2 ms** |
 
-**Improvement over empirical:** +12.5% R², -40% MAE
+**Улучшение над эмпирикой:** +12.5% R², -40% MAE
 
-## 🌐 Deploy to Railway
+---
 
-1. Push to GitHub
-2. Connect Railway to repo
-3. Add build command: `pip install -r requirements.txt && python train_models.py`
-4. Add start command: `gunicorn app:app`
-5. Deploy! 🚀
+## 🌐 Deploy на Railway
 
-Railway will automatically:
-- Install dependencies
-- Train models
-- Start API
-- Assign public URL
+**Автоматический деплой:**
 
-## 📝 Adding Your Own Data
+1. Push в GitHub
+2. Railway автоматически:
+   - Установит зависимости
+   - Обучит модели
+   - Запустит API
+   - Даст публичный URL
 
-Replace `data/composite_database.csv` with your experimental data:
+**Railway бесплатный план:**
+- ✅ 500 часов/месяц
+- ✅ 512 MB RAM
+- ✅ Достаточно для демо
+
+---
+
+## 📝 Добавление своих данных
+
+Замените `data/composite_database.csv`:
 ```csv
 fiber,matrix,vf,layup,manufacturing,tensile_strength,tensile_modulus,...
 E-Glass,Polyester,0.60,Quasi-isotropic,Compression Molding,227.8,14.3,...
 Carbon T300,Epoxy,0.55,Unidirectional 0°,Autoclave,1420,118,...
-...
 ```
 
-Then retrain:
+Затем переобучите:
 ```bash
 python train_models.py
 ```
 
+---
+
 ## 🤝 Contributing
 
-Contributions welcome! Areas for improvement:
-- Additional ML algorithms (XGBoost, Neural Networks)
-- More material types (natural fibers, hybrids)
-- Temperature/moisture effects
-- Advanced architectures (3D woven, braided)
+Contributions welcome! Области для улучшения:
+- Дополнительные ML алгоритмы (XGBoost, Neural Networks)
+- Больше типов материалов (natural fibers, hybrids)
+- Эффекты температуры/влажности
+- Сложные архитектуры (3D woven, braided)
+
+---
 
 ## 📄 License
 
-MIT License - see LICENSE file
+MIT License
 
-## 📚 Citation
-
-If you use this in research:
-```bibtex
-@software{hybrid_pirf_2024,
-  author = {Your Name},
-  title = {Hybrid PIRF: Physics-Informed ML for Composite Materials},
-  year = {2024},
-  url = {https://github.com/yourusername/composite-ml-api}
-}
-```
+---
 
 ## 📧 Contact
 
@@ -244,57 +267,3 @@ Questions? Open an issue or email: your.email@university.edu
 ---
 
 **Made with ❤️ for materials science research**
-```
-
----
-
-## 7️⃣ **.gitignore**
-```
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Models (too large for git)
-models/*.pkl
-models/*.joblib
-
-# Data (optional - include if small)
-# data/*.csv
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-
-# Environment
-.env
