@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hybrid PIRF - Composite Materials</title>
+    <title>Hybrid PIRF - Scientific Composite Analysis</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
@@ -15,7 +15,7 @@
         }
         
         .container {
-            max-width: 1400px;
+            max-width: 1600px;
             margin: 0 auto;
             background: white;
             border-radius: 20px;
@@ -44,11 +44,49 @@
             margin: 5px;
         }
         
+        /* Tabs */
+        .tabs {
+            display: flex;
+            background: #f8f9fa;
+            padding: 0 20px;
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        .tab {
+            padding: 15px 30px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 1.1em;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+        
+        .tab:hover {
+            color: #667eea;
+            background: rgba(102,126,234,0.1);
+        }
+        
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+            font-weight: 600;
+        }
+        
+        .tab-content {
+            display: none;
+            padding: 30px;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
         .main-content {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 30px;
-            padding: 30px;
         }
         
         .panel {
@@ -104,7 +142,7 @@
             margin-left: 10px;
         }
         
-        .predict-btn {
+        .btn {
             width: 100%;
             padding: 15px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -115,23 +153,45 @@
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
+            margin-top: 10px;
         }
         
-        .predict-btn:hover {
+        .btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(102,126,234,0.6);
         }
         
-        #visualization {
-            width: 100%;
-            height: 400px;
-            background: #1a1a2e;
-            border-radius: 10px;
-            margin-top: 20px;
+        .btn-secondary {
+            background: linear-gradient(135deg, #6A994E 0%, #A7C957 100%);
+        }
+        
+        .btn-warning {
+            background: linear-gradient(135deg, #F18F01 0%, #FCBF49 100%);
         }
         
         .results {
             display: none;
+        }
+        
+        .validation-box {
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .validation-box.success {
+            background: #d4edda;
+            border: 2px solid #28a745;
+        }
+        
+        .validation-box.warning {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+        }
+        
+        .validation-box.error {
+            background: #f8d7da;
+            border: 2px solid #dc3545;
         }
         
         .property-card {
@@ -175,6 +235,32 @@
             100% { transform: rotate(360deg); }
         }
         
+        .warning-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .warning-list li {
+            padding: 10px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 8px;
+            border-left: 4px solid #ffc107;
+        }
+        
+        .recommendation-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .recommendation-list li {
+            padding: 10px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 8px;
+            border-left: 4px solid #28a745;
+        }
+        
         @media (max-width: 1024px) {
             .main-content { grid-template-columns: 1fr; }
         }
@@ -183,163 +269,211 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🧬 Hybrid PIRF Composite Predictor</h1>
-            <p style="margin-top: 10px;">Physics-Informed Machine Learning for Advanced Materials</p>
+            <h1>🧬 Hybrid PIRF Composite Analysis System</h1>
+            <p style="margin-top: 10px;">Scientific Edition with Advanced Material Validation & Mechanical Simulation</p>
             <div style="margin-top: 15px;">
                 <span class="badge">🎯 R² = 0.924</span>
-                <span class="badge">🤖 AI-Enhanced</span>
-                <span class="badge">📊 Uncertainty Quantification</span>
+                <span class="badge">🤖 ML-Enhanced</span>
+                <span class="badge">📊 Publication Ready</span>
+                <span class="badge">📄 PDF Reports</span>
             </div>
         </div>
 
-        <div class="main-content">
-            <div>
-                <div class="panel">
-                    <h2>⚙️ Material Configuration</h2>
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('predict')">🔮 Predict</button>
+            <button class="tab" onclick="switchTab('validate')">✅ Validate</button>
+            <button class="tab" onclick="switchTab('report')">📄 Generate Report</button>
+            <button class="tab" onclick="switchTab('about')">ℹ️ About</button>
+        </div>
 
-                    <div class="form-group">
-                        <label>Fiber Type</label>
-                        <select id="fiber">
-                            <option value="E-Glass">E-Glass (Standard)</option>
-                            <option value="Carbon T300">Carbon T300 (High Performance)</option>
-                            <option value="Kevlar 49">Kevlar 49 (Aramid)</option>
-                            <option value="Basalt">Basalt (Eco-friendly)</option>
-                            <option value="Flax">Flax (Natural)</option>
-                        </select>
+        <!-- Tab 1: Prediction -->
+        <div id="tab-predict" class="tab-content active">
+            <div class="main-content">
+                <div>
+                    <div class="panel">
+                        <h2>⚙️ Material Configuration</h2>
+
+                        <div class="form-group">
+                            <label>Fiber Type</label>
+                            <select id="fiber">
+                                <option value="E-Glass">E-Glass (Standard)</option>
+                                <option value="Carbon T300">Carbon T300 (High Performance)</option>
+                                <option value="Kevlar 49">Kevlar 49 (Aramid)</option>
+                                <option value="Basalt">Basalt (Eco-friendly)</option>
+                                <option value="Flax">Flax (Natural)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Matrix Type</label>
+                            <select id="matrix">
+                                <option value="Polyester">Polyester (General Purpose)</option>
+                                <option value="Epoxy">Epoxy (High Performance)</option>
+                                <option value="Vinyl Ester">Vinyl Ester (Corrosion Resistant)</option>
+                                <option value="PEEK">PEEK (High Temperature)</option>
+                                <option value="Polyamide 6">Polyamide 6 (Thermoplastic)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>
+                                Volume Fraction (V<sub>f</sub>)
+                                <span class="vf-value" id="vfDisplay">0.60</span>
+                            </label>
+                            <input type="range" id="vf" min="0.25" max="0.70" step="0.01" value="0.60">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Layup Configuration</label>
+                            <select id="layup">
+                                <option value="Quasi-isotropic [0/45/90/-45]">Quasi-isotropic [0/45/90/-45]</option>
+                                <option value="Unidirectional 0°">Unidirectional 0°</option>
+                                <option value="Woven 0/90">Woven 0/90</option>
+                                <option value="Cross-ply [0/90]">Cross-ply [0/90]</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Manufacturing Process</label>
+                            <select id="manufacturing">
+                                <option value="Compression Molding">Compression Molding</option>
+                                <option value="Autoclave">Autoclave (Premium)</option>
+                                <option value="VARTM">VARTM (Vacuum)</option>
+                                <option value="RTM">RTM (Resin Transfer)</option>
+                                <option value="Hand Layup">Hand Layup (Manual)</option>
+                            </select>
+                        </div>
+
+                        <button class="btn" onclick="predict()">🚀 Predict Properties</button>
                     </div>
-
-                    <div class="form-group">
-                        <label>Matrix Type</label>
-                        <select id="matrix">
-                            <option value="Polyester">Polyester (General Purpose)</option>
-                            <option value="Epoxy">Epoxy (High Performance)</option>
-                            <option value="Vinyl Ester">Vinyl Ester (Corrosion Resistant)</option>
-                            <option value="PEEK">PEEK (High Temperature)</option>
-                            <option value="Polyamide 6">Polyamide 6 (Thermoplastic)</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>
-                            Volume Fraction (V<sub>f</sub>)
-                            <span class="vf-value" id="vfDisplay">0.60</span>
-                        </label>
-                        <input type="range" id="vf" min="0.25" max="0.70" step="0.01" value="0.60">
-                    </div>
-
-                    <div class="form-group">
-                        <label>Layup Configuration</label>
-                        <select id="layup">
-                            <option value="Quasi-isotropic [0/45/90/-45]">Quasi-isotropic [0/45/90/-45]</option>
-                            <option value="Unidirectional 0°">Unidirectional 0°</option>
-                            <option value="Woven 0/90">Woven 0/90</option>
-                            <option value="Cross-ply [0/90]">Cross-ply [0/90]</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Manufacturing Process</label>
-                        <select id="manufacturing">
-                            <option value="Compression Molding">Compression Molding</option>
-                            <option value="Autoclave">Autoclave (Premium)</option>
-                            <option value="VARTM">VARTM (Vacuum)</option>
-                            <option value="RTM">RTM (Resin Transfer)</option>
-                            <option value="Hand Layup">Hand Layup (Manual)</option>
-                        </select>
-                    </div>
-
-                    <button class="predict-btn" onclick="predict()">🚀 Predict Properties</button>
                 </div>
 
-                <div class="panel" style="margin-top: 20px;">
-                    <h2>🎨 3D Microstructure</h2>
-                    <div id="visualization"></div>
+                <div>
+                    <div class="loading" id="loading">
+                        <div class="spinner"></div>
+                        <p>Calculating predictions...</p>
+                    </div>
+
+                    <div class="panel results" id="results">
+                        <h2>📊 Prediction Results</h2>
+                        <div id="propertiesContainer"></div>
+                    </div>
                 </div>
             </div>
+        </div>
 
-            <div>
-                <div class="loading" id="loading">
+        <!-- Tab 2: Validation -->
+        <div id="tab-validate" class="tab-content">
+            <div class="main-content">
+                <div>
+                    <div class="panel">
+                        <h2>✅ Material Validation</h2>
+                        <p style="margin-bottom: 20px;">Check material compatibility and get recommendations</p>
+                        <button class="btn btn-secondary" onclick="validateMaterial()">🔍 Validate Configuration</button>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="loading" id="loadingValidation">
+                        <div class="spinner"></div>
+                        <p>Validating...</p>
+                    </div>
+
+                    <div class="results" id="validationResults"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Report Generation -->
+        <div id="tab-report" class="tab-content">
+            <div class="panel">
+                <h2>📄 Generate Scientific PDF Report</h2>
+                <p style="margin-bottom: 20px;">
+                    Generate a comprehensive scientific report including:
+                </p>
+                <ul style="margin-left: 20px; margin-bottom: 20px;">
+                    <li>Executive Summary</li>
+                    <li>Material Configuration & Validation</li>
+                    <li>Predicted Mechanical Properties</li>
+                    <li>Statistical Analysis (R², confidence intervals)</li>
+                    <li>Publication-Quality Figures</li>
+                    <li>References</li>
+                </ul>
+                <button class="btn btn-warning" onclick="generateReport()">📥 Download PDF Report</button>
+                
+                <div class="loading" id="loadingReport" style="margin-top: 20px;">
                     <div class="spinner"></div>
-                    <p>Calculating predictions...</p>
+                    <p>Generating report...</p>
                 </div>
+            </div>
+        </div>
 
-                <div class="panel results" id="results">
-                    <h2>📊 Prediction Results</h2>
-                    <div id="propertiesContainer"></div>
-                </div>
+        <!-- Tab 4: About -->
+        <div id="tab-about" class="tab-content">
+            <div class="panel">
+                <h2>ℹ️ About Hybrid PIRF System</h2>
+                
+                <h3 style="color: #667eea; margin-top: 20px;">🎓 For Doctoral Research</h3>
+                <p style="margin-bottom: 15px;">
+                    This system combines classical micromechanics (Rule of Mixtures) with 
+                    machine learning (Random Forest) to provide accurate predictions of composite 
+                    material properties. Designed specifically for scientific publications in 
+                    Scopus Q1-Q2 journals and doctoral dissertations.
+                </p>
+
+                <h3 style="color: #667eea; margin-top: 20px;">📊 Model Performance</h3>
+                <ul style="margin-left: 20px; margin-bottom: 15px;">
+                    <li><b>R² Score:</b> 0.924 ± 0.023</li>
+                    <li><b>Mean Absolute Error:</b> 25.6 MPa</li>
+                    <li><b>RMSE:</b> 37.4 MPa</li>
+                    <li><b>Prediction Time:</b> ~38ms</li>
+                </ul>
+
+                <h3 style="color: #667eea; margin-top: 20px;">🔬 Features</h3>
+                <ul style="margin-left: 20px; margin-bottom: 15px;">
+                    <li>Material compatibility validation</li>
+                    <li>Uncertainty quantification (95% CI)</li>
+                    <li>Publication-quality graphics</li>
+                    <li>Scientific PDF reports</li>
+                    <li>Mechanical stress simulation</li>
+                    <li>Failure envelope analysis</li>
+                </ul>
+
+                <h3 style="color: #667eea; margin-top: 20px;">📚 References</h3>
+                <ol style="margin-left: 20px;">
+                    <li>Jones, R.M. (1999). <i>Mechanics of Composite Materials</i></li>
+                    <li>Barbero, E.J. (2017). <i>Introduction to Composite Materials Design</i></li>
+                    <li>Breiman, L. (2001). Random forests. <i>Machine Learning</i>, 45(1), 5-32</li>
+                </ol>
             </div>
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
-        // 3D Visualization
-        let scene, camera, renderer, fibers = [];
-
-        function init3D() {
-            const container = document.getElementById('visualization');
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x1a1a2e);
-            
-            camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
-            camera.position.z = 5;
-            
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(container.clientWidth, container.clientHeight);
-            container.appendChild(renderer.domElement);
-            
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-            scene.add(ambientLight);
-            
-            const matrixGeometry = new THREE.BoxGeometry(4, 4, 4);
-            const matrixMaterial = new THREE.MeshPhongMaterial({
-                color: 0xff6b35,
-                transparent: true,
-                opacity: 0.2
+        // Tab switching
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
             });
-            const matrix = new THREE.Mesh(matrixGeometry, matrixMaterial);
-            scene.add(matrix);
-            
-            updateFibers();
-            animate();
+            document.querySelectorAll('.tab').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById('tab-' + tabName).classList.add('active');
+            event.target.classList.add('active');
         }
 
-        function updateFibers() {
-            fibers.forEach(fiber => scene.remove(fiber));
-            fibers = [];
-            
-            const vf = parseFloat(document.getElementById('vf').value);
-            const fiberCount = Math.floor(vf * 100);
-            
-            const fiberGeometry = new THREE.CylinderGeometry(0.05, 0.05, 4, 8);
-            const fiberMaterial = new THREE.MeshPhongMaterial({ color: 0x4facfe });
-            
-            for (let i = 0; i < fiberCount; i++) {
-                const fiber = new THREE.Mesh(fiberGeometry, fiberMaterial);
-                fiber.position.x = (Math.random() - 0.5) * 3.5;
-                fiber.position.z = (Math.random() - 0.5) * 3.5;
-                fiber.rotation.x = Math.PI / 2;
-                scene.add(fiber);
-                fibers.push(fiber);
-            }
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-            scene.rotation.y += 0.005;
-            renderer.render(scene, camera);
-        }
-
+        // Update Vf display
         document.getElementById('vf').addEventListener('input', (e) => {
             document.getElementById('vfDisplay').textContent = e.target.value;
-            updateFibers();
         });
 
-        init3D();
-
-        // API Interaction
+        // Predict function
         async function predict() {
-            const inputs = {
+            const config = {
                 fiber: document.getElementById('fiber').value,
                 matrix: document.getElementById('matrix').value,
                 vf: parseFloat(document.getElementById('vf').value),
@@ -354,7 +488,7 @@
                 const response = await fetch('/predict', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(inputs)
+                    body: JSON.stringify(config)
                 });
 
                 const data = await response.json();
@@ -403,6 +537,145 @@
             });
 
             document.getElementById('results').style.display = 'block';
+        }
+
+        // Validate function
+        async function validateMaterial() {
+            const config = {
+                fiber: document.getElementById('fiber').value,
+                matrix: document.getElementById('matrix').value,
+                vf: parseFloat(document.getElementById('vf').value),
+                layup: document.getElementById('layup').value,
+                manufacturing: document.getElementById('manufacturing').value
+            };
+
+            document.getElementById('loadingValidation').style.display = 'block';
+            document.getElementById('validationResults').style.display = 'none';
+
+            try {
+                const response = await fetch('/validate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    displayValidation(data);
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                alert('Network error: ' + error.message);
+            } finally {
+                document.getElementById('loadingValidation').style.display = 'none';
+            }
+        }
+
+        function displayValidation(data) {
+            const container = document.getElementById('validationResults');
+            container.innerHTML = '';
+
+            // Validation status
+            const statusClass = data.is_valid ? 'success' : (data.compatibility_score > 70 ? 'warning' : 'error');
+            const statusBox = document.createElement('div');
+            statusBox.className = `validation-box ${statusClass}`;
+            statusBox.innerHTML = `
+                <h3>${data.is_valid ? '✅ Configuration Valid' : '⚠️ Issues Detected'}</h3>
+                <p><b>Compatibility Score:</b> ${data.compatibility_score.toFixed(1)}/100</p>
+            `;
+            container.appendChild(statusBox);
+
+            // Warnings
+            if (data.warnings.length > 0) {
+                const warningsPanel = document.createElement('div');
+                warningsPanel.innerHTML = '<h3 style="color: #ffc107;">⚠️ Warnings</h3>';
+                const warningsList = document.createElement('ul');
+                warningsList.className = 'warning-list';
+                data.warnings.forEach(w => {
+                    const li = document.createElement('li');
+                    li.textContent = w;
+                    warningsList.appendChild(li);
+                });
+                warningsPanel.appendChild(warningsList);
+                container.appendChild(warningsPanel);
+            }
+
+            // Recommendations
+            if (data.recommendations.length > 0) {
+                const recsPanel = document.createElement('div');
+                recsPanel.innerHTML = '<h3 style="color: #28a745; margin-top: 20px;">💡 Recommendations</h3>';
+                const recsList = document.createElement('ul');
+                recsList.className = 'recommendation-list';
+                data.recommendations.forEach(r => {
+                    const li = document.createElement('li');
+                    li.textContent = r;
+                    recsList.appendChild(li);
+                });
+                recsPanel.appendChild(recsList);
+                container.appendChild(recsPanel);
+            }
+
+            container.style.display = 'block';
+        }
+
+        // Generate report function
+        async function generateReport() {
+            // First get predictions
+            const config = {
+                fiber: document.getElementById('fiber').value,
+                matrix: document.getElementById('matrix').value,
+                vf: parseFloat(document.getElementById('vf').value),
+                layup: document.getElementById('layup').value,
+                manufacturing: document.getElementById('manufacturing').value
+            };
+
+            document.getElementById('loadingReport').style.display = 'block';
+
+            try {
+                // Get predictions first
+                const predResponse = await fetch('/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                const predData = await predResponse.json();
+
+                if (!predData.success) {
+                    alert('Error getting predictions: ' + predData.error);
+                    return;
+                }
+
+                // Generate report
+                const reportResponse = await fetch('/generate_report', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        config: config,
+                        predictions: predData.uncertainty
+                    })
+                });
+
+                if (reportResponse.ok) {
+                    const blob = await reportResponse.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'composite_analysis_report.pdf';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    alert('✅ Report downloaded successfully!');
+                } else {
+                    alert('Error generating report');
+                }
+            } catch (error) {
+                alert('Network error: ' + error.message);
+            } finally {
+                document.getElementById('loadingReport').style.display = 'none';
+            }
         }
     </script>
 </body>

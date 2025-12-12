@@ -1,6 +1,0 @@
-fiber,matrix,vf,layup,manufacturing,tensile_strength,tensile_modulus,compressive_strength,flexural_strength,flexural_modulus,ilss,impact_energy
-E-Glass,Polyester,0.60,Quasi-isotropic [0/45/90/-45],Compression Molding,227.8,14.3,149.7,292.9,13.0,20.8,14.3
-E-Glass,Epoxy,0.55,Unidirectional 0°,Autoclave,845.2,39.5,567.3,1023.4,41.2,45.3,32.1
-Carbon T300,Epoxy,0.60,Quasi-isotropic [0/45/90/-45],Autoclave,678.4,68.2,512.7,834.5,71.3,52.4,28.7
-Kevlar 49,Epoxy,0.50,Woven 0/90,VARTM,512.3,42.1,287.5,623.8,44.6,38.2,52.3
-Basalt,Vinyl Ester,0.45,Cross-ply [0/90],RTM,398.7,26.3,312.4,487.2,27.8,32.1,18.4

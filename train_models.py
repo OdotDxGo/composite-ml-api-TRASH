@@ -1,245 +1,298 @@
 """
-Training script for Hybrid PIRF models
-Trains Random Forest models for each property using physics-informed features
+Hybrid PIRF Training Pipeline
+Trains Random Forest models for composite property prediction
 """
 
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
+from sklearn.preprocessing import StandardScaler
 import pickle
 import os
-from typing import Dict
-import warnings
-warnings.filterwarnings('ignore')
+from datetime import datetime
 
-# Import physics engine from app
-import sys
-sys.path.append('.')
-from app import PhysicsEngine, FeatureEngineer, FIBERS, MATRICES
+# Create directories
+os.makedirs('models', exist_ok=True)
+os.makedirs('data', exist_ok=True)
 
-def load_database():
-    """Load composite materials database"""
+# Material properties
+FIBERS = {
+    'Carbon T300': {'E': 230, 'sigma': 3530, 'rho': 1.76},
+    'E-Glass': {'E': 73, 'sigma': 3450, 'rho': 2.54},
+    'Kevlar 49': {'E': 131, 'sigma': 3620, 'rho': 1.44},
+    'Basalt': {'E': 89, 'sigma': 4840, 'rho': 2.75},
+    'Flax': {'E': 58, 'sigma': 1100, 'rho': 1.50}
+}
+
+MATRICES = {
+    'Epoxy': {'E': 3.2, 'sigma': 78, 'rho': 1.20},
+    'Polyester': {'E': 3.5, 'sigma': 55, 'rho': 1.15},
+    'Vinyl Ester': {'E': 3.4, 'sigma': 82, 'rho': 1.14},
+    'PEEK': {'E': 3.9, 'sigma': 105, 'rho': 1.32},
+    'Polyamide 6': {'E': 2.8, 'sigma': 82, 'rho': 1.14}
+}
+
+LAYUPS = [
+    'Unidirectional 0°', 'Unidirectional 90°', 'Woven 0/90',
+    'Quasi-isotropic [0/45/90/-45]', 'Angle-ply [±45]',
+    'Cross-ply [0/90]', 'Random Mat'
+]
+
+MANUFACTURING = [
+    'Autoclave', 'VARTM', 'RTM', 'Compression Molding',
+    'Hand Layup', 'Filament Winding', 'Pultrusion'
+]
+
+print("="*60)
+print("HYBRID PIRF TRAINING PIPELINE")
+print("="*60)
+
+# Generate synthetic training data
+def generate_training_data(n_samples=363):
+    """Generate physics-informed synthetic data"""
     
-    db_path = 'data/composite_database.csv'
-    
-    if os.path.exists(db_path):
-        df = pd.read_csv(db_path)
-        print(f"✓ Loaded {len(df)} records from database")
-        return df
-    
-    # Generate synthetic database
     print("⚠ No database found. Generating synthetic training data...")
     
     np.random.seed(42)
-    
     data = []
-    physics_engine = PhysicsEngine()
     
-    fibers = list(FIBERS.keys())
-    matrices = list(MATRICES.keys())
-    layups = ['Unidirectional 0°', 'Woven 0/90', 'Quasi-isotropic [0/45/90/-45]']
-    mfg_processes = ['Autoclave', 'VARTM', 'Compression Molding', 'Hand Layup']
-    
-    for fiber_name in fibers:
-        for matrix_name in matrices:
-            for layup in layups:
-                for mfg in mfg_processes:
-                    for Vf in [0.40, 0.50, 0.60]:
-                        
-                        fiber = FIBERS[fiber_name]
-                        matrix = MATRICES[matrix_name]
-                        
-                        rom_props = physics_engine.calculate_rom_properties(
-                            fiber, matrix, Vf, layup, mfg
-                        )
-                        
-                        noise_level = 0.08
-                        
-                        record = {
-                            'fiber': fiber_name,
-                            'matrix': matrix_name,
-                            'vf': Vf,
-                            'layup': layup,
-                            'manufacturing': mfg,
-                            'tensile_strength': rom_props['tensile_strength'] * np.random.normal(1.0, noise_level),
-                            'tensile_modulus': rom_props['tensile_modulus'] * np.random.normal(1.0, noise_level),
-                            'compressive_strength': rom_props['compressive_strength'] * np.random.normal(1.0, noise_level),
-                            'flexural_strength': rom_props['flexural_strength'] * np.random.normal(1.0, noise_level),
-                            'flexural_modulus': rom_props['flexural_modulus'] * np.random.normal(1.0, noise_level),
-                            'ilss': rom_props['ilss'] * np.random.normal(1.0, noise_level),
-                            'impact_energy': rom_props['impact_energy'] * np.random.normal(1.0, noise_level)
-                        }
-                        
-                        data.append(record)
+    for _ in range(n_samples):
+        fiber_name = np.random.choice(list(FIBERS.keys()))
+        matrix_name = np.random.choice(list(MATRICES.keys()))
+        Vf = np.random.uniform(0.40, 0.60)
+        layup = np.random.choice(LAYUPS)
+        manufacturing = np.random.choice(MANUFACTURING)
+        
+        fiber = FIBERS[fiber_name]
+        matrix = MATRICES[matrix_name]
+        
+        # Physics-based calculations with noise
+        E_L = fiber['E'] * Vf + matrix['E'] * (1 - Vf)
+        sigma_uts = fiber['sigma'] * Vf * 0.9 + matrix['sigma'] * (1 - Vf) * 0.45
+        
+        # Add realistic noise
+        noise_factor = np.random.normal(1.0, 0.15)
+        
+        data.append({
+            'fiber': fiber_name,
+            'matrix': matrix_name,
+            'vf': Vf,
+            'layup': layup,
+            'manufacturing': manufacturing,
+            'tensile_strength': sigma_uts * noise_factor * 0.262,
+            'tensile_modulus': E_L * noise_factor * 0.72,
+            'compressive_strength': sigma_uts * 0.75 * noise_factor * 0.202,
+            'flexural_strength': sigma_uts * 1.25 * noise_factor * 0.289,
+            'flexural_modulus': E_L * 1.05 * noise_factor * 0.60,
+            'ilss': matrix['sigma'] * 0.50 * (1 - 0.5 * Vf) * noise_factor * 1.49,
+            'impact_energy': (fiber['E'] * Vf * 0.015 + matrix['E'] * (1 - Vf) * 0.01) * noise_factor * 0.98
+        })
     
     df = pd.DataFrame(data)
-    
-    os.makedirs('data', exist_ok=True)
-    df.to_csv(db_path, index=False)
+    df.to_csv('data/training_data.csv', index=False)
     print(f"✓ Generated and saved {len(df)} synthetic records")
     
     return df
 
-def prepare_features(df):
-    """Prepare features for training"""
-    
-    physics_engine = PhysicsEngine()
-    feature_engineer = FeatureEngineer()
-    
-    X_list = []
-    
-    for idx, row in df.iterrows():
-        fiber = FIBERS[row['fiber']]
-        matrix = MATRICES[row['matrix']]
-        
-        rom_props = physics_engine.calculate_rom_properties(
-            fiber, matrix, row['vf'], row['layup'], row['manufacturing']
-        )
-        
-        features = feature_engineer.create_features(
-            row['fiber'], row['matrix'], row['vf'], 
-            row['layup'], row['manufacturing'], rom_props
-        )
-        
-        X_list.append(features.flatten())
-    
-    X = np.array(X_list)
-    
-    properties = ['tensile_strength', 'tensile_modulus', 'compressive_strength',
-                 'flexural_strength', 'flexural_modulus', 'ilss', 'impact_energy']
-    
-    y = df[properties].values
-    
-    return X, y, properties
+# Load or generate data
+data_path = 'data/training_data.csv'
+if os.path.exists(data_path):
+    df = pd.read_csv(data_path)
+    print(f"✓ Loaded {len(df)} records from {data_path}")
+else:
+    df = generate_training_data()
 
-def train_models(X, y, property_names):
-    """Train Random Forest models for each property"""
-    
-    print("\n" + "="*60)
-    print("TRAINING HYBRID PIRF MODELS")
-    print("="*60)
-    
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.15, random_state=42
-    )
-    
-    scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled = scaler.transform(X_test)
-    
-    models = {}
-    results = []
-    
-    for i, prop in enumerate(property_names):
-        print(f"\n--- Training: {prop} ---")
-        
-        y_train_prop = y_train[:, i]
-        y_test_prop = y_test[:, i]
-        
-        rf = RandomForestRegressor(
-            n_estimators=150,
-            max_depth=15,
-            min_samples_split=5,
-            min_samples_leaf=2,
-            random_state=42,
-            n_jobs=-1
-        )
-        
-        rf.fit(X_train_scaled, y_train_prop)
-        
-        y_pred_train = rf.predict(X_train_scaled)
-        y_pred_test = rf.predict(X_test_scaled)
-        
-        r2_train = r2_score(y_train_prop, y_pred_train)
-        r2_test = r2_score(y_test_prop, y_pred_test)
-        mae_test = mean_absolute_error(y_test_prop, y_pred_test)
-        rmse_test = np.sqrt(mean_squared_error(y_test_prop, y_pred_test))
-        
-        print(f"  R² (train): {r2_train:.3f}")
-        print(f"  R² (test):  {r2_test:.3f}")
-        print(f"  MAE (test): {mae_test:.2f}")
-        print(f"  RMSE (test): {rmse_test:.2f}")
-        
-        cv_scores = cross_val_score(rf, X_train_scaled, y_train_prop, 
-                                    cv=5, scoring='r2', n_jobs=-1)
-        print(f"  CV R² (5-fold): {cv_scores.mean():.3f} ± {cv_scores.std():.3f}")
-        
-        models[prop] = {
-            'rf': rf,
-            'r2_test': r2_test,
-            'mae_test': mae_test
-        }
-        
-        results.append({
-            'property': prop,
-            'r2_train': r2_train,
-            'r2_test': r2_test,
-            'r2_cv_mean': cv_scores.mean(),
-            'r2_cv_std': cv_scores.std(),
-            'mae': mae_test,
-            'rmse': rmse_test
-        })
-    
-    print("\n" + "="*60)
-    print("TRAINING SUMMARY")
-    print("="*60)
-    
-    results_df = pd.DataFrame(results)
-    print(results_df.to_string(index=False))
-    print(f"\nAverage R² (test): {results_df['r2_test'].mean():.3f}")
-    print(f"Average R² (CV):   {results_df['r2_cv_mean'].mean():.3f}")
-    
-    return models, scaler, results_df
+print(f"\nDataset: {len(df)} samples")
+print(f"  Fibers: {df['fiber'].nunique()}")
+print(f"  Matrices: {df['matrix'].nunique()}")
+print(f"  Vf range: [{df['vf'].min():.2f}, {df['vf'].max():.2f}]")
 
-def save_models(models, scaler):
-    """Save trained models"""
-    
-    os.makedirs('models', exist_ok=True)
-    
-    with open('models/hybrid_model.pkl', 'wb') as f:
-        pickle.dump(models, f)
-    
-    with open('models/scaler.pkl', 'wb') as f:
-        pickle.dump(scaler, f)
-    
-    print("\n✓ Models saved to models/")
-    print("  - hybrid_model.pkl")
-    print("  - scaler.pkl")
-
-def main():
-    """Main training pipeline"""
-    
-    print("\n" + "="*60)
-    print("HYBRID PIRF TRAINING PIPELINE")
-    print("="*60)
-    
-    df = load_database()
-    print(f"\nDataset: {len(df)} samples")
-    print(f"  Fibers: {df['fiber'].nunique()}")
-    print(f"  Matrices: {df['matrix'].nunique()}")
-    print(f"  Vf range: [{df['vf'].min():.2f}, {df['vf'].max():.2f}]")
+# Feature engineering
+def create_features(df):
+    """Create 26 physics-informed features"""
     
     print("\nPreparing physics-informed features...")
-    X, y, property_names = prepare_features(df)
+    
+    X = []
+    
+    fiber_encoding = {f: i for i, f in enumerate(FIBERS.keys())}
+    matrix_encoding = {m: i for i, m in enumerate(MATRICES.keys())}
+    layup_encoding = {l: i for i, l in enumerate(LAYUPS)}
+    mfg_encoding = {m: i for i, m in enumerate(MANUFACTURING)}
+    
+    for _, row in df.iterrows():
+        fiber = FIBERS[row['fiber']]
+        matrix = MATRICES[row['matrix']]
+        Vf = row['vf']
+        
+        # Base features (5)
+        features = [
+            fiber_encoding[row['fiber']],
+            matrix_encoding[row['matrix']],
+            Vf,
+            layup_encoding[row['layup']],
+            mfg_encoding[row['manufacturing']]
+        ]
+        
+        # Physics-derived (7)
+        E_L = fiber['E'] * Vf + matrix['E'] * (1 - Vf)
+        sigma_uts = fiber['sigma'] * Vf * 0.9
+        features.extend([
+            sigma_uts * 0.262,
+            E_L * 0.72,
+            sigma_uts * 0.75 * 0.202,
+            sigma_uts * 1.25 * 0.289,
+            E_L * 1.05 * 0.60,
+            matrix['sigma'] * 0.50 * (1 - 0.5 * Vf) * 1.49,
+            (fiber['E'] * Vf * 0.015) * 0.98
+        ])
+        
+        # Ratios (4)
+        features.extend([
+            fiber['E'] / matrix['E'],
+            fiber['sigma'] / matrix['sigma'],
+            fiber['rho'] / matrix['rho'],
+            1.0  # G_f/G_m approximation
+        ])
+        
+        # Vf transformations (3)
+        features.extend([
+            Vf ** 2,
+            Vf ** 3,
+            1 / (1 - Vf + 1e-6)
+        ])
+        
+        # Interactions (7)
+        features.extend([
+            Vf * (fiber['E'] / matrix['E']),
+            Vf * (fiber['sigma'] / matrix['sigma']),
+            E_L ** 2,
+            sigma_uts * E_L,
+            Vf * E_L,
+            (1 - Vf) * matrix['E'],
+            (fiber['E'] / matrix['E']) * (fiber['sigma'] / matrix['sigma'])
+        ])
+        
+        X.append(features)
+    
+    X = np.array(X)
     print(f"  Feature matrix: {X.shape}")
-    print(f"  Targets: {y.shape}")
-    print(f"  Features per sample: {X.shape[1]}")
     
-    models, scaler, results = train_models(X, y, property_names)
-    
-    save_models(models, scaler)
-    
-    results.to_csv('models/training_results.csv', index=False)
-    print("  - training_results.csv")
-    
-    print("\n✓ Training complete!")
-    print("\nNext steps:")
-    print("  1. Review training_results.csv")
-    print("  2. Test predictions with app.py")
-    print("  3. Deploy to Railway")
+    return X
 
-if __name__ == '__main__':
-    main()
+# Prepare features and targets
+X = create_features(df)
+
+target_properties = [
+    'tensile_strength', 'tensile_modulus', 'compressive_strength',
+    'flexural_strength', 'flexural_modulus', 'ilss', 'impact_energy'
+]
+
+y = df[target_properties].values
+print(f"  Targets: {y.shape}")
+print(f"  Features per sample: {X.shape[1]}")
+
+# Train models
+print("\n" + "="*60)
+print("TRAINING HYBRID PIRF MODELS")
+print("="*60)
+
+models = {}
+results = []
+
+for i, prop in enumerate(target_properties):
+    print(f"\n--- Training: {prop} ---")
+    
+    y_prop = y[:, i]
+    
+    # Split data
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y_prop, test_size=0.2, random_state=42
+    )
+    
+    # Scale features
+    if i == 0:  # Only create scaler once
+        scaler = StandardScaler()
+        X_train_scaled = scaler.fit_transform(X_train)
+    else:
+        X_train_scaled = scaler.transform(X_train)
+    
+    X_test_scaled = scaler.transform(X_test)
+    
+    # Train Random Forest
+    rf = RandomForestRegressor(
+        n_estimators=150,
+        max_depth=15,
+        min_samples_split=5,
+        min_samples_leaf=2,
+        random_state=42,
+        n_jobs=-1
+    )
+    
+    rf.fit(X_train_scaled, y_train)
+    
+    # Evaluate
+    r2_train = rf.score(X_train_scaled, y_train)
+    r2_test = rf.score(X_test_scaled, y_test)
+    
+    y_pred = rf.predict(X_test_scaled)
+    mae = np.mean(np.abs(y_test - y_pred))
+    rmse = np.sqrt(np.mean((y_test - y_pred) ** 2))
+    
+    # Cross-validation
+    cv_scores = cross_val_score(rf, X_train_scaled, y_train, cv=5, 
+                                scoring='r2', n_jobs=-1)
+    
+    print(f"  R² (train): {r2_train:.3f}")
+    print(f"  R² (test):  {r2_test:.3f}")
+    print(f"  MAE (test): {mae:.2f}")
+    print(f"  RMSE (test): {rmse:.2f}")
+    print(f"  CV R² (5-fold): {cv_scores.mean():.3f} ± {cv_scores.std():.3f}")
+    
+    models[prop] = {
+        'rf': rf,
+        'r2_train': r2_train,
+        'r2_test': r2_test,
+        'mae': mae,
+        'rmse': rmse,
+        'cv_mean': cv_scores.mean(),
+        'cv_std': cv_scores.std()
+    }
+    
+    results.append({
+        'property': prop,
+        'r2_train': r2_train,
+        'r2_test': r2_test,
+        'r2_cv_mean': cv_scores.mean(),
+        'r2_cv_std': cv_scores.std(),
+        'mae': mae,
+        'rmse': rmse
+    })
+
+# Save models
+print("\n" + "="*60)
+print("TRAINING SUMMARY")
+print("="*60)
+
+results_df = pd.DataFrame(results)
+print(results_df.to_string(index=False))
+
+print(f"\nAverage R² (test): {results_df['r2_test'].mean():.3f}")
+print(f"Average R² (CV):   {results_df['r2_cv_mean'].mean():.3f}")
+
+# Save to disk
+with open('models/hybrid_model.pkl', 'wb') as f:
+    pickle.dump(models, f)
+
+with open('models/scaler.pkl', 'wb') as f:
+    pickle.dump(scaler, f)
+
+results_df.to_csv('models/training_results.csv', index=False)
+
+print("\n✓ Models saved to models/")
+print("  - hybrid_model.pkl")
+print("  - scaler.pkl")
+print("  - training_results.csv")
+
+print("\n✓ Training complete!")

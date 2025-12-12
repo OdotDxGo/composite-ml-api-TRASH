@@ -23,11 +23,16 @@ wheels/
 .installed.cfg
 *.egg
 
-# Models (will be generated during build)
+# Models and data (generated during build)
 models/*.pkl
+models/*.csv
+data/*.csv
+data/*.xlsx
 
-# Data
-# data/*.csv
+# Output files
+output/
+*.pdf
+*.png
 
 # IDE
 .vscode/
@@ -43,12 +48,7 @@ Thumbs.db
 # Logs
 *.log
 
-# Environment
-.env
-
-# Test outputs
-*.png
-*.xlsx
-validation_results.csv
-batch_predictions.csv
-load_test_results.csv
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/

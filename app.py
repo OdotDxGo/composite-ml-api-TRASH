@@ -1,9 +1,9 @@
 """
-Hybrid Physics-Informed Machine Learning API for Composite Materials
-Version: 2.0 (Enhanced with ML)
+Enhanced Hybrid Physics-Informed Machine Learning API for Composite Materials
+Version: 3.0 (Scientific Edition with Advanced Analysis)
 """
 
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
 import numpy as np
 import pickle
@@ -13,8 +13,21 @@ from typing import Dict, List, Tuple
 import warnings
 warnings.filterwarnings('ignore')
 
+# Import new modules
+import sys
+sys.path.append(os.path.dirname(__file__))
+
+from material_validator import MaterialValidator, ValidationResult
+from scientific_plotter import ScientificPlotter
+from pdf_report_generator import ScientificReportGenerator
+from mechanical_simulator import MechanicalSimulator, StressState
+
 app = Flask(__name__, static_folder='static')
 CORS(app)
+
+# Create output directories
+os.makedirs('output/plots', exist_ok=True)
+os.makedirs('output/reports', exist_ok=True)
 
 # ===========================
 # МАТЕРИАЛЬНЫЕ КОНСТАНТЫ
@@ -284,7 +297,7 @@ class HybridPIRF:
         if not self.models:
             return {
                 'predictions': rom_predictions,
-                'uncertainty': {k: {'lower': v*0.85, 'upper': v*1.15} 
+                'uncertainty': {k: {'lower': v*0.85, 'upper': v*1.15, 'std': v*0.10} 
                                for k, v in rom_predictions.items()},
                 'method_weights': {'physics': 1.0, 'ml': 0.0},
                 'confidence': 'low'
@@ -300,6 +313,9 @@ class HybridPIRF:
         
         property_names = ['tensile_strength', 'tensile_modulus', 'compressive_strength',
                          'flexural_strength', 'flexural_modulus', 'ilss', 'impact_energy']
+        
+        weights_ml = []
+        weights_physics = []
         
         for prop in property_names:
             if prop in self.models:
@@ -322,6 +338,9 @@ class HybridPIRF:
                 w_ml_norm = w_ml / w_total
                 w_physics_norm = w_physics / w_total
                 
+                weights_ml.append(w_ml_norm)
+                weights_physics.append(w_physics_norm)
+                
                 hybrid_pred = w_ml_norm * ml_pred + w_physics_norm * physics_pred
                 
                 hybrid_std = np.sqrt(w_ml_norm**2 * ml_std**2 + 
@@ -331,7 +350,8 @@ class HybridPIRF:
                 uncertainties[prop] = {
                     'lower': float(hybrid_pred - 1.96 * hybrid_std),
                     'upper': float(hybrid_pred + 1.96 * hybrid_std),
-                    'std': float(hybrid_std)
+                    'std': float(hybrid_std),
+                    'value': float(hybrid_pred)
                 }
                 
             else:
@@ -339,15 +359,16 @@ class HybridPIRF:
                 uncertainties[prop] = {
                     'lower': rom_predictions[prop] * 0.85,
                     'upper': rom_predictions[prop] * 1.15,
-                    'std': rom_predictions[prop] * 0.10
+                    'std': rom_predictions[prop] * 0.10,
+                    'value': rom_predictions[prop]
                 }
         
         return {
             'predictions': predictions,
             'uncertainty': uncertainties,
             'method_weights': {
-                'physics': float(np.mean([w_physics_norm for _ in property_names])),
-                'ml': float(np.mean([w_ml_norm for _ in property_names]))
+                'physics': float(np.mean(weights_physics)) if weights_physics else 0.5,
+                'ml': float(np.mean(weights_ml)) if weights_ml else 0.5
             },
             'confidence': 'high' if self.models else 'medium'
         }
@@ -359,6 +380,8 @@ class HybridPIRF:
 physics_engine = PhysicsEngine()
 feature_engineer = FeatureEngineer()
 hybrid_model = HybridPIRF()
+material_validator = MaterialValidator()
+scientific_plotter = ScientificPlotter()
 
 hybrid_model.load_models()
 
@@ -436,47 +459,61 @@ def predict():
             'error': str(e)
         }), 500
 
-@app.route('/compare_methods', methods=['POST'])
-def compare_methods():
-    """Compare predictions from different methods"""
+@app.route('/validate', methods=['POST'])
+def validate():
+    """Material validation endpoint"""
     try:
         data = request.json
         
-        fiber_name = data['fiber']
-        matrix_name = data['matrix']
-        Vf = float(data['vf'])
-        layup = data['layup']
-        manufacturing = data['manufacturing']
-        
-        fiber = FIBERS[fiber_name]
-        matrix = MATRICES[matrix_name]
-        
-        rom_props = physics_engine.calculate_rom_properties(
-            fiber, matrix, Vf, layup, manufacturing
+        validation_result = material_validator.validate_configuration(
+            fiber=data['fiber'],
+            matrix=data['matrix'],
+            vf=float(data['vf']),
+            layup=data['layup'],
+            manufacturing=data['manufacturing']
         )
         
-        features = feature_engineer.create_features(
-            fiber_name, matrix_name, Vf, layup, manufacturing, rom_props
-        )
-        
-        hybrid_result = hybrid_model.predict(features, rom_props)
-        
-        response = {
+        return jsonify({
             'success': True,
-            'methods': {
-                'empirical': {
-                    'predictions': rom_props,
-                    'description': 'Pure physics-based Rule of Mixtures'
-                },
-                'hybrid': {
-                    'predictions': hybrid_result['predictions'],
-                    'uncertainty': hybrid_result['uncertainty'],
-                    'description': 'Physics-Informed Random Forest (PIRF)'
-                }
-            }
-        }
+            'is_valid': validation_result.is_valid,
+            'compatibility_score': validation_result.compatibility_score,
+            'warnings': validation_result.warnings,
+            'recommendations': validation_result.recommendations,
+            'alternative_configs': validation_result.alternative_configs
+        })
         
-        return jsonify(response)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/generate_report', methods=['POST'])
+def generate_report():
+    """Generate PDF scientific report"""
+    try:
+        data = request.json
+        
+        config = data['config']
+        predictions = data['predictions']
+        
+        # Get validation
+        validation_result = material_validator.validate_configuration(
+            config['fiber'], config['matrix'], config['vf'],
+            config['layup'], config['manufacturing']
+        )
+        
+        # Generate report
+        generator = ScientificReportGenerator()
+        output_path = f"output/reports/report_{config['fiber']}_{config['matrix']}.pdf"
+        
+        generator.generate_report(
+            config=config,
+            predictions=predictions,
+            validation_result=validation_result,
+            plots_dir='output/plots',
+            output_path=output_path
+        )
+        
+        return send_file(output_path, as_attachment=True, 
+                        download_name='composite_analysis_report.pdf')
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -498,9 +535,15 @@ def health():
     """Health check"""
     return jsonify({
         'status': 'healthy',
-        'version': '2.0',
+        'version': '3.0',
         'models_loaded': len(hybrid_model.models) > 0,
-        'num_models': len(hybrid_model.models)
+        'num_models': len(hybrid_model.models),
+        'features': [
+            'Material Validation',
+            'Scientific Plotting',
+            'PDF Report Generation',
+            'Mechanical Simulation'
+        ]
     })
 
 if __name__ == '__main__':
