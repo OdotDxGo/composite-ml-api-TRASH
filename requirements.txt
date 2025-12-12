@@ -6,10 +6,3 @@ scikit-learn==1.3.0
 scipy==1.11.2
 joblib==1.3.2
 gunicorn==21.2.0
-```
-
----
-
-## **ФАЙЛ 4: `Procfile`**
-```
-web: gunicorn app:app
