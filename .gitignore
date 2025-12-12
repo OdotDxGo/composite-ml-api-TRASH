@@ -1,54 +1,19 @@
-# Python
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
+*.pyc
+*.pyo
+*.pyd
 .Python
-env/
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.env
 venv/
 ENV/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Models and data (generated during build)
-models/*.pkl
-models/*.csv
-data/*.csv
-data/*.xlsx
-
-# Output files
-output/
-*.pdf
-*.png
-
-# IDE
 .vscode/
 .idea/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
 *.log
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
+.DS_Store
+output/
+data/synthetic_data.csv

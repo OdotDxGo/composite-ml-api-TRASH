@@ -1,2 +1,2 @@
-# This file keeps the models/ directory in git
-# Actual model files (.pkl) will be generated during Railway build
+# This file ensures the models directory is tracked by git
+# ML models will be generated here during deployment
